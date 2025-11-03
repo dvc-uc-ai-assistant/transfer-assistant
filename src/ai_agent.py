@@ -631,7 +631,11 @@ def interactive_session(client: OpenAI, data: Dict[str, Any], args) -> None:
     query_id = 1
     print("\nAsk a transfer question (e.g., 'what do I need for uc berkeley cs', "
           "'uc davis & ucsd cs requirements', or 'major preparation only for berkeley and davis').")
-    user_q = input("> ").strip()
+    try:
+        user_q = input("> ").strip()
+    except KeyboardInterrupt:
+        print("\nInterrupted by user. Exiting session.")
+        return
     if not user_q:
         user_q = "major preparation only for uc berkeley cs and uc davis"
 
@@ -698,7 +702,11 @@ def interactive_session(client: OpenAI, data: Dict[str, Any], args) -> None:
         print("  • Remove a campus: 'remove uc davis', 'drop berkeley'")
         print("  • Clear categories: 'clear categories'   • Reset completions: 'reset'")
         print("  • Finish: 'done'")
-        follow = input("> ").strip()
+        try:
+            follow = input("> ").strip()
+        except KeyboardInterrupt:
+            print("\nInterrupted by user. Exiting session.")
+            return
         if not follow:
             continue
 
@@ -853,9 +861,17 @@ def main():
             print("CLI campuses → none recognized; falling back to parsed input")
 
     while True:
-        interactive_session(client, data, args)
-        print("\nStart another query session? (yes/no)")
-        again = input("> ").strip().lower()
+        try:
+            interactive_session(client, data, args)
+        except KeyboardInterrupt:
+            print("\nInterrupted by user. Exiting.")
+            break
+        try:
+            print("\nStart another query session? (yes/no)")
+            again = input("> ").strip().lower()
+        except KeyboardInterrupt:
+            print("\nInterrupted by user. Exiting.")
+            break
         if again not in ("y", "yes"):
             print("Goodbye! 👋")
             break
