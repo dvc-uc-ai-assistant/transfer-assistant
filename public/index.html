@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chatbot</title>
+  <style>
+    body {
+      background-color: #ECEBE4;
+      font-family: sans-serif;
+    }
+    #chat-container {
+      width: 500px;
+      margin: 50px auto;
+      border: 1px solid #28464B;
+      border-radius: 10px;
+      padding: 20px;
+      background-color: #fff;
+    }
+    #chat-messages {
+      height: 300px;
+      overflow-y: scroll;
+      padding: 10px;
+      border-bottom: 1px solid #ECEBE4;
+    }
+    #user-input {
+      display: flex;
+      margin-top: 20px;
+    }
+    #prompt-input {
+      flex-grow: 1;
+      border: 1px solid #ECEBE4;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    #send-button {
+      background-color: #43863C;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+    .user-message {
+      text-align: right;
+      margin: 10px 0;
+    }
+    .bot-message {
+      text-align: left;
+      margin: 10px 0;
+    }
+    .message-bubble {
+      display: inline-block;
+      padding: 10px;
+      border-radius: 10px;
+    }
+    .user-bubble {
+      background-color: #F98948;
+      color: #fff;
+    }
+    .bot-bubble {
+      background-color: #28464B;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div id="chat-container">
+    <div id="chat-messages"></div>
+    <div id="user-input">
+      <input type="text" id="prompt-input" placeholder="Type your message...">
+      <button id="send-button">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const sendButton = document.getElementById('send-button');
+    const promptInput = document.getElementById('prompt-input');
+    const chatMessages = document.getElementById('chat-messages');
+
+    sendButton.addEventListener('click', async () => {
+      const prompt = promptInput.value;
+      promptInput.value = '';
+
+      const userMessageDiv = document.createElement('div');
+      userMessageDiv.classList.add('user-message');
+      userMessageDiv.innerHTML = `<span class="message-bubble user-bubble">${prompt}</span>`;
+      chatMessages.appendChild(userMessageDiv);
+
+      try {
+        const response = await fetch('http://127.0.0.1:8080/prompt', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ prompt })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const botMessageDiv = document.createElement('div');
+          botMessageDiv.classList.add('bot-message');
+          botMessageDiv.innerHTML = `<span class="message-bubble bot-bubble">${data.response}</span>`;
+          chatMessages.appendChild(botMessageDiv);
+        } else {
+          console.error('Error:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    });
+  </script>
+</body>
+</html>
