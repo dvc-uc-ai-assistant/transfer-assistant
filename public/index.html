@@ -1,0 +1,101 @@
+<!doctype html><!DOCTYPE html>
+
+<html><html>
+
+  <head><head>
+
+    <meta charset="utf-8" />  <title>Course Transfer Assistant</title>
+
+    <title>Transfer Assistant - Minimal UI</title>  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>  <style>
+
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; padding: 1rem; }    :root {
+
+      textarea { width: 100%; height: 6rem; }      --bg-color: #ECEBE4;
+
+      pre { background: #f6f8fa; padding: .5rem; }      --primary-dark: #28464B;
+
+    </style>      --primary-green: #43863C;
+
+  </head>      --accent-orange: #F98948;
+
+  <body>      --text-light: #fff;
+
+    <h1>Transfer Assistant — Minimal UI</h1>      --container-bg: #fff;
+
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Transfer Assistant - Minimal UI</title>
+        <style>
+          body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; padding: 1rem; }
+          textarea { width: 100%; height: 6rem; }
+          pre { background: #f6f8fa; padding: .5rem; }
+        </style>
+      </head>
+      <body>
+        <h1>Transfer Assistant — Minimal UI</h1>
+        <p>This is a small fallback UI to test the backend while the React frontend is not built.</p>
+
+        <section>
+          <h2>Health</h2>
+          <button id="healthBtn">Check /health</button>
+          <pre id="healthOut">(no data)</pre>
+        </section>
+
+        <section>
+          <h2>Prompt</h2>
+          <form id="promptForm">
+            <label>Campus JSON (optional):</label>
+            <br />
+            <select id="campus">
+              <option value="ucb_25-26.json">ucb_25-26.json</option>
+              <option value="ucsd_24-25.json">ucsd_24-25.json</option>
+              <option value="ucd_24-25.json">ucd_24-25.json</option>
+            </select>
+            <br /><br />
+            <textarea id="promptText" placeholder="Type a short user message to parse and format..."></textarea>
+            <br />
+            <button type="submit">Send</button>
+          </form>
+          <h3>Response</h3>
+          <pre id="promptOut">(no response)</pre>
+        </section>
+
+        <script>
+          document.getElementById('healthBtn').addEventListener('click', async () => {
+            const out = document.getElementById('healthOut');
+            out.textContent = 'Checking...';
+            try {
+              const r = await fetch('/health');
+              const j = await r.json();
+              out.textContent = JSON.stringify(j, null, 2);
+            } catch (e) {
+              out.textContent = 'Error: ' + e;
+            }
+          });
+
+          document.getElementById('promptForm').addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            const out = document.getElementById('promptOut');
+            out.textContent = 'Sending...';
+            const text = document.getElementById('promptText').value;
+            const campus = document.getElementById('campus').value;
+            try {
+              const r = await fetch('/prompt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: text, campus_json: campus })
+              });
+              const j = await r.json();
+              out.textContent = JSON.stringify(j, null, 2);
+            } catch (e) {
+              out.textContent = 'Error: ' + e;
+            }
+          });
+        </script>
+      </body>
+    </html>
+        }

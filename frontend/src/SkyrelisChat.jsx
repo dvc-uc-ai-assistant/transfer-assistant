@@ -49,9 +49,10 @@ export default function SkyrelisChat() {
 
   async function checkHealth() {
     try {
-      const r = await fetch(`${apiBase}/`, { method: "GET" });
+      const r = await fetch(`${apiBase}/health`, { method: "GET" });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      alert("✅ Backend reachable.");
+      const j = await r.json();
+      alert(j.ok ? "✅ Backend reachable." : `⚠️ Backend not ready: ${j.loaded_campuses?.length || 0} campuses loaded`);
     } catch {
       alert("❌ Can’t reach backend. Verify VITE_API_BASE in .env.");
     }
