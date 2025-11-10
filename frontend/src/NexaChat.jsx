@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-export default function SkyrelisChat() {
+export default function NexaChat() {
   const [messages, setMessages] = useState([
     { role: "assistant", content: "👋 Hi! I’m NEXA — ask me anything about DVC → UC transfers." },
   ]);
