@@ -58,6 +58,17 @@ body {
   padding: .7rem 1rem; cursor: pointer; font-weight: 600;
 }
 .btn.secondary { background: var(--accent-orange); }
+/* Secondary (suggested prompt) hover/focus and outline */
+.btn.secondary:hover,
+.btn.secondary:focus {
+  /* slightly darker orange on hover for affordance */
+  filter: brightness(.93);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(67,134,60,0.12), 0 0 0 1px var(--primary-green) inset;
+}
+.btn.secondary:active {
+  transform: translateY(1px);
+}
 
 /* chat UI */
 .chat-card { border-radius: 12px; overflow: hidden; border: 1px solid #d9d7cf; }

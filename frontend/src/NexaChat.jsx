@@ -108,7 +108,7 @@ export default function NexaChat() {
                 {m.prompts.map((prompt, j) => (
                   <button
                     key={j}
-                    className="btn" // Use the theme's .btn class
+                    className="btn secondary" // Use the theme's .btn.secondary (orange)
                     onClick={() => sendMessage(prompt)}
                     disabled={loading}
                     // Add "round" style and override padding for a better look
