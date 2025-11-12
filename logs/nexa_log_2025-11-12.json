@@ -8,5 +8,14 @@
       "UCSD"
     ],
     "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I (5 units)\n• MATH-194/294 — Linear Algebra/Differential Equations (8 units"
+  },
+  {
+    "timestamp": "2025-11-12T08:38:40.824Z",
+    "session_id": "sess_6e5d14a0139d",
+    "user_prompt": "What Science courses are required for Computer Science at UC Davis?",
+    "campuses": [
+      "UCD"
+    ],
+    "response_preview": "Transfer prep for UC Davis:\n• COMSC-200 — Object Oriented Programming C++ (4 units)\n• COMSC-210 — Program Design and Data Structures (4 units)\n• COMSC"
   }
 ]
