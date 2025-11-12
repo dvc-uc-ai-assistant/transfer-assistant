@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from "react";
 
 // Suggested prompts list
 const suggestedPrompts = [
-  "What GE courses should I take at DVC for UC Berkeley?",
-  "Is programming required for the CS major at UC Davis?",
-  "Show me the required courses for a business major at UCSD.",
+  "What CS courses should I take at DVC for UC Berkeley?",
+  "What Science courses are required for Computer Science at UC Davis?",
+  "Show me the required courses for UCSD and UCB.",
   "I've completed Math 192, what does that cover at UCB?",
 ];
 
