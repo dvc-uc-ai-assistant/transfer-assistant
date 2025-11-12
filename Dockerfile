@@ -10,6 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the backend code
 COPY app.py .
+# Copy helper modules from repo root
+COPY log_writer.py .
 COPY backend ./backend
 COPY agreements_25-26 ./agreements_25-26
 

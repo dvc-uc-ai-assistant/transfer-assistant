@@ -17,5 +17,15 @@
       "UCD"
     ],
     "response_preview": "Transfer prep for UC Davis:\n• COMSC-200 — Object Oriented Programming C++ (4 units)\n• COMSC-210 — Program Design and Data Structures (4 units)\n• COMSC"
+  },
+  {
+    "timestamp": "2025-11-12T20:43:56.704Z",
+    "session_id": "sess_35a8f30e6abc",
+    "user_prompt": "Show me the required courses for UCSD and UCB.",
+    "campuses": [
+      "UCB",
+      "UCSD"
+    ],
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I (5 units)\n• MATH-194/294 — Linear Algebra/Differential Equations (8 units"
   }
 ]
