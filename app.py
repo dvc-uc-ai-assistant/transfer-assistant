@@ -19,20 +19,10 @@ from backend.ai_agent import (
 load_dotenv()
 
 # --- Flask App Setup ---
-# The static_folder is set to 'public' so Flask can serve your index.html, CSS, and JS files.
-app = Flask(__name__, static_folder='public', static_url_path='')
+# Serve the built frontend files from the 'frontend/dist' directory.
+app = Flask(__name__, static_folder=os.path.join('frontend', 'dist'), static_url_path='')
 CORS(app)
 
-# Prefer serving a built frontend if it exists. This makes it simple to serve the
-# React/Vite `frontend/dist` output without copying files into `public/`.
-frontend_dist_index = os.path.join('frontend', 'dist', 'index.html')
-if os.path.exists(frontend_dist_index):
-    # Use absolute path for the static folder to avoid confusion when running from scripts/
-    app.static_folder = os.path.abspath(os.path.join('frontend', 'dist'))
-    print(f"Serving static files from: {app.static_folder}")
-else:
-    app.static_folder = os.path.abspath('public')
-    print(f"Serving static files from: {app.static_folder}")
 
 # --- AI Agent and Data Loading ---
 api_key = os.getenv("OPENAI_API_KEY")
@@ -43,62 +33,37 @@ if not api_key:
 else:
     client = OpenAI(api_key=api_key)
 
-# Load all campus data once at startup.
-data = load_all_data([
-    os.path.join("agreements_25-26", "*.json"),
-])
-print("✅ Loaded campuses:", sorted(list(data.keys())))
-if not data:
-    print("⚠️ No campus files loaded. Check the 'agreements_25-26/' directory.")
+# --- Lazy Loading Data Cache ---
+_data_cache = None
+
+def get_data():
+    """Lazily loads and caches the campus data."""
+    global _data_cache
+    if _data_cache is None:
+        print("Loading campus data...")
+        _data_cache = load_all_data([
+            os.path.join("agreements_25-26", "*.json"),
+        ])
+        print("✅ Loaded campuses:", sorted(list(_data_cache.keys())))
+        if not _data_cache:
+            print("⚠️ No campus files loaded. Check the 'agreements_25-26/' directory.")
+    return _data_cache
 
 # --- API and Frontend Routes ---
 
-@app.route('/')
-def serve_index():
-    """Serves the main index.html file from the 'public' directory."""
-    # Prefer a demo public/ index, then a built frontend, otherwise show a helpful page.
-    public_index = os.path.join(app.static_folder, 'index.html')
-    frontend_dist_index = os.path.join('frontend', 'dist', 'index.html')
-    frontend_src_index = os.path.join('frontend', 'index.html')
-
-    if os.path.exists(public_index):
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        # For any other path, serve the index.html file for the React app to handle routing.
         return send_from_directory(app.static_folder, 'index.html')
-    if os.path.exists(frontend_dist_index):
-        # Serve built React app files from frontend/dist
-        return send_from_directory(os.path.dirname(frontend_dist_index), os.path.basename(frontend_dist_index))
-    if os.path.exists(frontend_src_index):
-        # The React app is present but not built. Serve a small helper page that tells the developer
-        # to run the Vite dev server or build the frontend.
-        helper_html = f"""
-        <!doctype html>
-        <html>
-          <head><meta charset='utf-8'><title>Frontend not built</title></head>
-          <body>
-            <h2>Frontend not built</h2>
-            <p>The repository contains a frontend development project but the built assets were not found.</p>
-            <p>To use the development server (recommended):</p>
-            <pre>cd frontend
-npm install
-npm run dev</pre>
-            <p>Then open <a href='http://localhost:5173' target='_blank'>http://localhost:5173</a></p>
-            <p>Or build the frontend and place the output in <code>frontend/dist/</code> or copy into <code>public/</code>.</p>
-          </body>
-        </html>
-        """
-        return helper_html
-
-    return (
-        jsonify({
-            'error': 'No index.html found',
-            'checked': [public_index, frontend_dist_index, frontend_src_index],
-            'hint': 'Build the frontend (cd frontend && npm run build) or place a demo index.html in public/'
-        }),
-        404,
-    )
 
 
 @app.route('/health', methods=['GET'])
 def health():
+    data = get_data()
     loaded = list(data.keys()) if isinstance(data, dict) else []
     ok = bool(loaded)
     return (jsonify({'ok': ok, 'has_api_key': bool(api_key), 'loaded_campuses': loaded}), 200 if ok else 503)
@@ -106,6 +71,7 @@ def health():
 @app.route('/prompt', methods=['POST'])
 def handle_prompt():
     """Handles the AI prompt requests from the frontend."""
+    data = get_data()
     req_data = request.get_json() or {}
     user_prompt = req_data.get('prompt')
     if not user_prompt:
