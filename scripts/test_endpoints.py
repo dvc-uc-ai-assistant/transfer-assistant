@@ -18,6 +18,18 @@ with app.test_client() as c:
     print('body (first 800 chars):\n')
     print(body[:800])
 
+    # Parse index for asset references and request them to detect 404s
+    import re
+    scripts = re.findall(r'<script[^>]+src="([^"]+)"', body)
+    links = re.findall(r'<link[^>]+href="([^"]+)"', body)
+    assets = [a for a in (scripts + links) if a and not a.startswith('http')]
+    if assets:
+        print('\n--- Asset check ---')
+        for a in assets:
+            path = a if a.startswith('/') else '/' + a
+            rr = c.get(path)
+            print(f"{path} -> {rr.status_code} ({len(rr.get_data())} bytes)")
+
     print('\n--- GET /health ---')
     r2 = c.get('/health')
     print('status:', r2.status_code)

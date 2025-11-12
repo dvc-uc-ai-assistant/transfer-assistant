@@ -1,8 +1,22 @@
+
 import { useEffect, useRef, useState } from "react";
+
+// Suggested prompts list
+const suggestedPrompts = [
+  "What CS courses should I take at DVC for UC Berkeley?",
+  "What Science courses are required for Computer Science at UC Davis?",
+  "Show me the required courses for UCSD and UCB.",
+  "I've completed Math 192, what does that cover at UCB?",
+];
 
 export default function NexaChat() {
   const [messages, setMessages] = useState([
-    { role: "assistant", content: "👋 Hi! I’m NEXA — ask me anything about DVC → UC transfers." },
+    // The initial message now contains the prompts
+    {
+      role: "assistant",
+      content: "👋 Hi! I’m NEXA — ask me anything about DVC → UC transfers. Here are some ideas to get started:",
+      prompts: suggestedPrompts,
+    },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,11 +28,14 @@ export default function NexaChat() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function sendMessage() {
-    const text = input.trim();
+  // Modified to accept an optional promptText
+  async function sendMessage(promptText) {
+    const text = (typeof promptText === 'string' ? promptText : input).trim();
     if (!text) return;
 
+    // Add the new user message to the chat
     setMessages((prev) => [...prev, { role: "user", content: text }]);
+
     setInput("");
     setLoading(true);
 
@@ -81,8 +98,32 @@ export default function NexaChat() {
       </div>
 
       <div className="chat-window">
+        {/* Updated rendering logic for messages */}
         {messages.map((m, i) => (
-          <div key={i} className={`msg ${m.role === "user" ? "user" : "bot"}`}>{m.content}</div>
+          <div key={i} className={`msg ${m.role === "user" ? "user" : "bot"}`}>
+            {m.content}
+            {/* Render buttons if the message has prompts */}
+            {m.prompts && (
+              <div className="suggested-prompts-in-message" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
+                {m.prompts.map((prompt, j) => (
+                  <button
+                    key={j}
+                    className="btn" // Use the theme's .btn class
+                    onClick={() => sendMessage(prompt)}
+                    disabled={loading}
+                    // Add "round" style and override padding for a better look
+                    style={{
+                      borderRadius: '999px', // Makes the button pill-shaped
+                      padding: '6px 14px',
+                      fontSize: '13px'
+                    }}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         ))}
         <div ref={chatEndRef} />
       </div>
@@ -94,7 +135,7 @@ export default function NexaChat() {
         <input
           className="text-input"
           type="text"
-          placeholder="Type your question… (UCB/UCD/UCSD supported)"
+          placeholder="Type your question…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
         />
