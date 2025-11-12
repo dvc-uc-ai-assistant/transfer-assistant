@@ -1,0 +1,10 @@
+[
+  {
+    "timestamp": "2025-11-12T07:38:52.046Z",
+    "session_id": "sess_271f0d23be91",
+    "user_prompt": "what are transfer requirements for ucb and ucsd",
+    "campuses": [],
+    "response_preview": "Demo response (offline mode). The backend is running without an OpenAI key.",
+    "offline": true
+  }
+]

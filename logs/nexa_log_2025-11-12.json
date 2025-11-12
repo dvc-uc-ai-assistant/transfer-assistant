@@ -1,0 +1,12 @@
+[
+  {
+    "timestamp": "2025-11-12T08:23:01.317Z",
+    "session_id": "sess_96d39f5f47b2",
+    "user_prompt": "what are ucb and ucsd requirements",
+    "campuses": [
+      "UCB",
+      "UCSD"
+    ],
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I (5 units)\n• MATH-194/294 — Linear Algebra/Differential Equations (8 units"
+  }
+]
