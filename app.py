@@ -25,12 +25,23 @@ CORS(app)
 
 
 # --- AI Agent and Data Loading ---
-api_key = os.getenv("OPENAI_API_KEY")
+raw_api_key = os.getenv("OPENAI_API_KEY")
+# Normalize common accidental formatting: strip surrounding whitespace and quotes
+api_key = None
+if raw_api_key:
+    api_key = raw_api_key.strip()
+    if (api_key.startswith('"') and api_key.endswith('"')) or (api_key.startswith("'") and api_key.endswith("'")):
+        api_key = api_key[1:-1].strip()
+
 OFFLINE_MODE = os.getenv("OFFLINE_MODE", "false").lower() in ("1", "true", "yes")
+print(f"OFFLINE_MODE={OFFLINE_MODE}")
+
 if not api_key:
-    print("WARNING: OPENAI_API_KEY is missing. Server will run in limited mode.")
+    print("WARNING: OPENAI_API_KEY is missing or malformed. Server will run in limited mode.")
     client = None
 else:
+    # Print a masked confirmation (don't leak the key)
+    print(f"Loaded OPENAI_API_KEY (masked): {'*' * (6) }... (len={len(api_key)})")
     client = OpenAI(api_key=api_key)
 
 # --- Lazy Loading Data Cache ---
