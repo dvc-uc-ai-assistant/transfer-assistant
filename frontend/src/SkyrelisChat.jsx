@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
+function TypingBubble() {
+  return <div className="msg bot" aria-live="polite">…</div>;
+}
+
 export default function SkyrelisChat() {
   const [messages, setMessages] = useState([
-    { role: "assistant", content: "👋 Hi! I’m NEXA — ask me anything about DVC → UC transfers." },
+    { role: "assistant", content: "Hi — I’m NEXA. Ask me anything about DVC → UC transfers." },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -12,11 +16,11 @@ export default function SkyrelisChat() {
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, loading]);
 
   async function sendMessage() {
     const text = input.trim();
-    if (!text) return;
+    if (!text || loading) return;
 
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setInput("");
@@ -28,19 +32,18 @@ export default function SkyrelisChat() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: text }),
       });
-
       if (!res.ok) {
         const t = await res.text().catch(() => "");
         throw new Error(t || `HTTP ${res.status}`);
       }
       const data = await res.json();
-      const reply = data.response || "Hmm, I didn’t get a response.";
+      const reply = data.response || "I didn’t receive a response from the model.";
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     } catch (err) {
       console.error(err);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "⚠️ I couldn’t reach the server. Check the base URL in .env and try again." },
+        { role: "assistant", content: "I couldn’t reach the server. Confirm the API URL in .env and try again." },
       ]);
     } finally {
       setLoading(false);
@@ -58,24 +61,20 @@ export default function SkyrelisChat() {
   }
 
   return (
-    <div className="chat-card">
-      <div className="chat-header" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+    <div className="chat-card" role="region" aria-label="NEXA chat">
+      <div className="chat-header">
         <strong>NEXA Chatbot</strong>
         <span
           style={{
-            marginLeft: 8,
-            padding: "2px 8px",
-            fontSize: 12,
-            borderRadius: 999,
-            background: "rgba(255,255,255,.18)",
-            border: "1px solid rgba(255,255,255,.35)"
+            marginLeft: 8, padding: "2px 8px", fontSize: 12, borderRadius: 999,
+            background: "#f5f4ff", border: "1px solid #dfdbf3", color: "#3a3443"
           }}
           title="Currently supports UC Berkeley, UC Davis, and UC San Diego."
         >
           UCB · UCD · UCSD only
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <button className="btn" onClick={checkHealth}>Health</button>
+          <button className="btn secondary" onClick={checkHealth}>Health</button>
         </div>
       </div>
 
@@ -83,23 +82,20 @@ export default function SkyrelisChat() {
         {messages.map((m, i) => (
           <div key={i} className={`msg ${m.role === "user" ? "user" : "bot"}`}>{m.content}</div>
         ))}
+        {loading && <TypingBubble />}
         <div ref={chatEndRef} />
       </div>
 
-      <form
-        className="input-row"
-        onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
-      >
+      <form className="input-row" onSubmit={(e) => { e.preventDefault(); sendMessage(); }}>
         <input
           className="text-input"
           type="text"
           placeholder="Type your question… (UCB/UCD/UCSD supported)"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          aria-label="Message input"
         />
-        <button className="btn" type="submit" disabled={loading}>
-          {loading ? "…" : "Send"}
-        </button>
+        <button className="btn" type="submit" disabled={loading}>{loading ? "…" : "Send"}</button>
       </form>
     </div>
   );
