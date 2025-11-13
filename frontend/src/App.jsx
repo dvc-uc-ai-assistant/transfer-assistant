@@ -11,11 +11,11 @@ export default function App() {
         <nav className="navbar">
           <div className="navbar-inner">
             <h1 className="nav-title">NEXA</h1>
-            <div className="nav-spacer" />
             <NavLink to="/" end className={({isActive}) => "nav-link" + (isActive ? " active" : "")}>Home</NavLink>
             <NavLink to="/how-to" className={({isActive}) => "nav-link" + (isActive ? " active" : "")}>How&nbsp;to&nbsp;Use</NavLink>
             <NavLink to="/chat" className={({isActive}) => "nav-link" + (isActive ? " active" : "")}>Chat</NavLink>
             <NavLink to="/contact" className={({isActive}) => "nav-link" + (isActive ? " active" : "")}>Contact</NavLink>
+            <div className="nav-spacer" />
           </div>
         </nav>
 

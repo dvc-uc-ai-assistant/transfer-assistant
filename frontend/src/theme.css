@@ -46,19 +46,21 @@ body {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0.75rem;
+  gap: 0.5rem;
   /* keep the inner card full height of the sidebar */
   width: 100%;
   height: 100%;
-  padding: 2rem 1rem;
+  /* reduce top padding so nav links sit higher in the sidebar */
+  padding: 1rem 1rem 2rem 1rem;
   background: linear-gradient(180deg, rgba(var(--primary-dark-rgb),0.98), rgba(var(--primary-dark-rgb),0.94));
   color: var(--text-light);
   border-radius: 0 14px 14px 0; /* rounded on the right side only */
   box-shadow: 8px 0 28px rgba(0,0,0,0.18);
   border-right: 1px solid rgba(255,255,255,0.03);
 }
-.nav-title { margin: 0 0 1rem 0; font-size: 1.15rem; font-weight: 800; letter-spacing: .2px; text-align: left; }
+.nav-title { margin: 0 0 .4rem 0; font-size: 1.15rem; font-weight: 800; letter-spacing: .2px; text-align: left; }
 .nav-spacer { flex: 1; }
+.navbar-inner .nav-spacer { display: none; }
 .nav-link {
   display: flex;
   align-items: center;
@@ -71,6 +73,11 @@ body {
   font-weight: 700;
   opacity: .98;
   position: relative;
+}
+.nav-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(176,226,152,0.18);
+  background: rgba(255,255,255,0.04);
 }
 .nav-link::after { display: none; } /* underline from horizontal design not needed on vertical nav */
 .nav-link.active { background: rgba(255,255,255,0.06); opacity: 1; }
@@ -152,6 +159,8 @@ body {
     animation: none;
   }
 }
+  /* restore spacer when navbar is horizontal */
+  .navbar-inner .nav-spacer { display: block; flex: 1; }
 
 /* buttons */
 .btn {
