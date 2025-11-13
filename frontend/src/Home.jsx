@@ -1,29 +1,62 @@
 export default function Home() {
   return (
     <div className="page">
-      <h1 style={{ color: "var(--primary-dark)", marginTop: 0 }}>Welcome to NEXA</h1>
+      <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "nowrap", minHeight: '60vh' }}>
+  <div style={{ flex: "1 1 50%", maxWidth: "50%", minWidth: 0, padding: '0 40px', boxSizing: "border-box" }}>
+          <h1 className="nexa-glow" style={{ fontSize: "50px", color: "var(--text-light)", marginTop: 0, textAlign: "center" }}>Welcome to NEXA</h1>
 
-      <p>
-        This is your DVC → UC transfer assistant. Use the <strong>Chat</strong> page to ask
-        questions, explore requirements, and get tailored guidance for your transfer path.
-        We currently support <strong>UCB, UCD, and UCSD</strong>.
-      </p>
+          <p style={{ marginTop: 8, textAlign: "center" }}>
+            Your DVC → UC transfer assistant for <strong style={{ color: "var(--dark-accent)" }}>Computer Science</strong> majors.
+          </p>
+          <p style={{ textAlign: "center" }}>
+            Use the <strong style={{ color: "var(--dark-accent)" }}>Chat</strong> page to ask
+            questions, explore requirements, and get tailored guidance for your transfer path.
+            We currently support <strong style={{ color: "var(--dark-accent)" }}>UCB, UCD, and UCSD</strong>.
+          </p>
+        </div>
 
-      <div
-        style={{
-          marginTop: 16,
-          padding: 16,
-          border: "1px solid #d9d7cf",
-          borderRadius: 12,
-          background: "#fff",
-        }}
-      >
-        <h3 style={{ marginTop: 0 }}>Quick Start</h3>
-        <ul>
-          <li>Go to the <strong>Chat</strong> tab and ask about articulation, ASSIST, or campus requirements.</li>
-          <li>We’ll soon add a <strong>Campus Explorer</strong> tab with filters and data visualizations.</li>
-          <li>Use <strong>Contact</strong> to send us feedback.</li>
-        </ul>
+  <div style={{ flex: "1 1 50%", maxWidth: "50%", minWidth: 0, marginTop: 0, padding: '0 40px', boxSizing: "border-box" }}>
+          <div
+            style={{
+              marginTop: 0,
+              padding: 32,
+              boxSizing: "border-box",
+              borderRadius: 12,
+              background: "var(--bg-color)",
+              color: "var(--primary-dark)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+            }}
+          >
+            <h3 style={{ marginTop: 0, textAlign: "center", color: "var(--dark-accent)", fontSize: "35px" }}>Quick Start</h3>
+
+            <div className="button-row" style={{ marginTop: 12 }}>
+              <button className="btn round">
+                <p>Get usage tips on the <strong>How To Use</strong> tab.</p>
+              </button>
+              <button className="btn round">
+                <p>Real-time assistant on the <strong>Chat</strong> tab.</p>
+              </button>
+              <button className="btn round">
+                <p>Use <strong>Contact</strong> to send us feedback.</p>
+              </button>
+            </div>
+            {/* metrics row (matches screenshot: large colored number + small label) */}
+            <div className="metrics-row" style={{ marginTop: 18 }}>
+              <div className="metric">
+                <div className="metric-value metric-green">40+</div>
+                <div className="metric-label">Course Mappings</div>
+              </div>
+              <div className="metric">
+                <div className="metric-value metric-blue">24/7</div>
+                <div className="metric-label">Responses</div>
+              </div>
+              <div className="metric">
+                <div className="metric-value metric-pink">3</div>
+                <div className="metric-label">UC Campuses</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

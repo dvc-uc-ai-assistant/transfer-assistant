@@ -22,7 +22,7 @@ export default function NexaChat() {
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef(null);
 
-  const apiBase = import.meta.env.VITE_API_BASE || "";
+  const apiBase = import.meta.env.OPENAI_API_KEY || "";
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -71,7 +71,7 @@ export default function NexaChat() {
       const j = await r.json();
       alert(j.ok ? "✅ Backend reachable." : `⚠️ Backend not ready: ${j.loaded_campuses?.length || 0} campuses loaded`);
     } catch {
-      alert("❌ Can’t reach backend. Verify VITE_API_BASE in .env.");
+      alert("❌ Can’t reach backend. Verify OPENAI_API_KEY in .env.");
     }
   }
 

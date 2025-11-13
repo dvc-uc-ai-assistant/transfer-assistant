@@ -1,10 +1,15 @@
 :root{
-  --bg-color: #ECEBE4;
-  --primary-dark: #28464B;
-  --primary-green: #43863C;
-  --accent-orange: #F98948;
-  --text-light: #fff;
-  --container-bg: #fff;
+  --bg-color: #f9f9f9;
+  --primary-dark: #091E05;
+  --primary-green: #B0E298;
+  --accent-pink: #E072A4;
+  --text-light: #f9f9f9;
+  --container-bg: #E072A4;
+  --light-accent: #6883BA;
+  --dark-accent: #3D3B8E;
+  --green-shadow: #498F28;
+  --green-shadow-rgb: 73,143,40;
+  --accent-pink-rgb: 224,114,164;
 }
 
 /* base */
@@ -12,7 +17,7 @@ html, body, #root { height: 100%; }
 body {
   margin: 0;
   background: var(--bg-color);
-  color: #222;
+  color: var(--primary-dark);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
@@ -25,13 +30,23 @@ body {
 
 /* top nav */
 .navbar {
-  background: var(--primary-dark);
-  color: var(--text-light);
-  border-bottom: 3px solid var(--accent-orange);
+  position: sticky;
+  top: 12px;
+  z-index: 50;
+  background: transparent; /* navbar container is transparent so .navbar-inner looks like a floating card */
+  padding: 0.5rem 0;
 }
 .navbar-inner {
-  display: flex; align-items: center; gap: .5rem;
-  max-width: 1100px; margin: 0 auto; padding: .85rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: .75rem 1rem;
+  background: var(--primary-dark);
+  color: var(--text-light);
+  border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.12);
 }
 .nav-title { margin: 0; font-size: 1.1rem; font-weight: 700; letter-spacing: .2px; }
 .nav-spacer { flex: 1; }
@@ -46,18 +61,73 @@ body {
   max-width: 1100px;
   margin: 1.25rem auto 2rem;
   padding: 1rem;
-  background: var(--container-bg);
+  background: var(--primary-green);
   border-radius: 14px;
   box-shadow: 0 6px 24px rgba(0,0,0,.07);
 }
 
+/* Stack child elements vertically with a small gap */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* heading glow for Welcome to NEXA (neon) */
+.page h1.nexa-glow {
+  /* neon-style high-contrast green glow */
+  color: var(--text-light);
+  /* intense layered glows for a neon effect */
+  text-shadow:
+    0 0 6px rgba(var(--accent-pink-rgb), 1),
+    0 0 12px rgba(var(--accent-pink-rgb), 0.9),
+    0 0 24px rgba(var(--accent-pink-rgb), 0.75),
+    0 6px 30px rgba(var(--accent-pink-rgb), 0.45);
+  /* faster, more noticeable neon pulse */
+  animation: nexa-glow-fade 2.8s ease-in-out infinite;
+  will-change: text-shadow, transform;
+  transition: text-shadow 160ms ease;
+}
+
+@keyframes nexa-glow-fade {
+  0%, 100% {
+    text-shadow:
+      0 0 4px rgba(var(--accent-pink-rgb), 0.85),
+      0 0 10px rgba(var(--accent-pink-rgb), 0.75),
+      0 0 20px rgba(var(--accent-pink-rgb), 0.55),
+      0 4px 18px rgba(var(--accent-pink-rgb), 0.36);
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    text-shadow:
+      0 0 10px rgba(var(--accent-pink-rgb), 1),
+      0 0 22px rgba(var(--accent-pink-rgb), 0.95),
+      0 0 48px rgba(var(--accent-pink-rgb), 0.8),
+      0 8px 40px rgba(var(--accent-pink-rgb), 0.5);
+    transform: translateY(-1px) scale(1.01);
+  }
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .page h1.nexa-glow { animation: none; }
+}
+
+@media (max-width: 640px) {
+  /* reduce heavy shadows on small screens for readability/perf */
+  .page h1.nexa-glow {
+    text-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    animation: none;
+  }
+}
+
 /* buttons */
 .btn {
-  background: var(--primary-green); color: var(--text-light);
+  background: var(--accent-pink); color: var(--text-light);
   border: 0; border-radius: 10px;
   padding: .7rem 1rem; cursor: pointer; font-weight: 600;
 }
-.btn.secondary { background: var(--accent-orange); }
+.btn.secondary { background: var(--primary-green); }
 /* Secondary (suggested prompt) hover/focus and outline */
 .btn.secondary:hover,
 .btn.secondary:focus {
@@ -83,3 +153,76 @@ body {
   border: 1px solid #cfcac0; outline: none; background: #fff;
 }
 .text-input:focus { border-color: var(--primary-dark); box-shadow: 0 0 0 3px rgba(40,70,75,.1); }
+
+/* Utility: horizontal button row and round buttons */
+.button-row {
+  display: flex;
+  gap: 12px;
+}
+/* Make buttons in a .button-row split available space evenly */
+.button-row .btn {
+  flex: 1 1 0;
+  /* min-width: 0; /* allow shrinking inside flex */
+  text-align: center;
+  /* keep the row height consistent and make children stretch to fill */
+  align-items: stretch;
+  min-height: 44px; /* ensures a stable row height */
+}
+
+/* Metrics row used on Home Quick Start */
+.metrics-row {
+  display: flex;
+  gap: 12px; /* match button-row gap so columns align */
+  justify-content: space-between; /* distribute equally across the available width */
+  align-items: center;
+  margin-top: 12px;
+}
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 0; /* take equal width like buttons */
+}
+.metric-value {
+  font-weight: 800;
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.metric-label {
+  font-size: 12px;
+  color: #222;
+}
+.metric-green { color: rgba(var(--green-shadow-rgb), 1); }
+.metric-blue { color: var(--light-accent); }
+.metric-pink { color: rgba(var(--accent-pink-rgb), 1); }
+
+@media (max-width: 640px) {
+  .metrics-row { gap: 12px; }
+  .metric-value { font-size: 20px; }
+}
+
+.btn.round {
+  border-radius: 12px;
+  padding: .45rem 1rem;
+  transition: background 150ms ease, color 150ms ease, transform 120ms ease, box-shadow 150ms ease;
+}
+.btn.round:hover,
+.btn.round:focus {
+  filter: brightness(.93);
+  outline: "var(--dark-accent)" 2px;
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px "var(--dark-accent)";
+  color: "var(--light-accent)"
+}
+.btn.round:active {
+  transform: translateY(1px);
+}
+
+.btn.round:hover,
+.btn.round:focus-visible {
+  background: var(--light-accent);
+  color: var(--text-light);
+}
+
