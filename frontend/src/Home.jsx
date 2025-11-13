@@ -3,8 +3,8 @@ export default function Home() {
     <div className="page">
       <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "nowrap", minHeight: '60vh' }}>
   <div style={{ flex: "1 1 50%", maxWidth: "50%", minWidth: 0, padding: '0 40px', boxSizing: "border-box" }}>
-          <h1 className="nexa-glow" style={{ fontSize: "50px", color: "var(--text-light)", marginTop: 0, textAlign: "center" }}>Welcome to NEXA</h1>
-
+          <h1 className="nexa-glow" style={{ fontSize: "50px", color: "var(--text-light)", marginTop: 0, textAlign: "center" }}>Find the NEXT transfer courses with NEXA</h1>
+          
           <p style={{ marginTop: 8, textAlign: "center" }}>
             Your DVC → UC transfer assistant for <strong style={{ color: "var(--dark-accent)" }}>Computer Science</strong> majors.
           </p>
