@@ -1,10 +1,18 @@
 :root{
-  --bg-color: #ECEBE4;
-  --primary-dark: #28464B;
-  --primary-green: #43863C;
-  --accent-orange: #F98948;
-  --text-light: #fff;
-  --container-bg: #fff;
+  --bg-color: #f9f9f9;
+  --primary-dark: #091E05;
+  --primary-dark-rgb: 9,30,5;
+  --nav-width: 220px;
+  --page-gutter: 3rem; /* visible gutter between sidebar and page */
+  --primary-green: #B0E298;
+  --accent-pink: #E072A4;
+  --text-light: #f9f9f9;
+  --container-bg: #E072A4;
+  --light-accent: #6883BA;
+  --dark-accent: #3D3B8E;
+  --green-shadow: #498F28;
+  --green-shadow-rgb: 73,143,40;
+  --accent-pink-rgb: 224,114,164;
 }
 
 /* base */
@@ -12,7 +20,7 @@ html, body, #root { height: 100%; }
 body {
   margin: 0;
   background: var(--bg-color);
-  color: #222;
+  color: var(--primary-dark);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 
@@ -23,41 +31,144 @@ body {
   grid-template-rows: auto 1fr auto;
 }
 
-/* top nav */
+/* left vertical nav */
 .navbar {
-  background: var(--primary-dark);
-  color: var(--text-light);
-  border-bottom: 3px solid var(--accent-orange);
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: var(--nav-width);
+  z-index: 60;
+  background: transparent; /* inner card provides visual styling */
+  padding: 0; /* inner padding handled by .navbar-inner */
 }
 .navbar-inner {
-  display: flex; align-items: center; gap: .5rem;
-  max-width: 1100px; margin: 0 auto; padding: .85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  /* keep the inner card full height of the sidebar */
+  width: 100%;
+  height: 100%;
+  /* reduce top padding so nav links sit higher in the sidebar */
+  padding: 1rem 1rem 2rem 1rem;
+  background: linear-gradient(180deg, rgba(var(--primary-dark-rgb),0.98), rgba(var(--primary-dark-rgb),0.94));
+  color: var(--text-light);
+  border-radius: 0 14px 14px 0; /* rounded on the right side only */
+  box-shadow: 8px 0 28px rgba(0,0,0,0.18);
+  border-right: 1px solid rgba(255,255,255,0.03);
 }
-.nav-title { margin: 0; font-size: 1.1rem; font-weight: 700; letter-spacing: .2px; }
+.nav-title { margin: 0 0 .4rem 0; font-size: 1.15rem; font-weight: 800; letter-spacing: .2px; text-align: left; }
 .nav-spacer { flex: 1; }
+.navbar-inner .nav-spacer { display: none; }
 .nav-link {
-  color: var(--text-light); text-decoration: none;
-  padding: .45rem .75rem; border-radius: .55rem; font-weight: 600; opacity: .9;
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  width: 100%;
+  color: var(--text-light);
+  text-decoration: none;
+  padding: .6rem .8rem;
+  border-radius: .6rem;
+  font-weight: 700;
+  opacity: .98;
+  position: relative;
 }
-.nav-link.active { background: rgba(255,255,255,0.14); opacity: 1; }
+.nav-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(176,226,152,0.18);
+  background: rgba(255,255,255,0.04);
+}
+.nav-link::after { display: none; } /* underline from horizontal design not needed on vertical nav */
+.nav-link.active { background: rgba(255,255,255,0.06); opacity: 1; }
+
+/* page offset handled in the main .page block below so overrides don't accidentally remove it */
+
+/* responsive: collapse to top horizontal nav on small screens */
+@media (max-width: 900px) {
+  .navbar { position: sticky; height: auto; width: auto; left: auto; top: 0; }
+  .navbar-inner { flex-direction: row; align-items: center; border-radius: 14px; padding: 1.05rem 1.4rem; box-shadow: 0 14px 36px rgba(0,0,0,0.12); border-right: none; }
+  .nav-link { padding: .6rem 1rem; }
+  .page { margin: 1.5rem auto 3rem; }
+}
 
 /* page container */
 .page {
-  max-width: 1100px;
-  margin: 1.25rem auto 2rem;
-  padding: 1rem;
-  background: var(--container-bg);
+  /* increase the page container width and padding for a roomier layout */
+  max-width: 1300px;
+  /* offset the page on the left to account for the fixed sidebar; use --page-gutter for tunable blank space */
+  margin: 1.5rem 2rem 3rem calc(var(--nav-width) + var(--page-gutter));
+  /* symmetric inner padding so left/right blank space inside the page matches */
+  padding: 2rem 2rem 2rem 2rem;
+  background: var(--primary-green);
   border-radius: 14px;
   box-shadow: 0 6px 24px rgba(0,0,0,.07);
 }
 
+/* Stack child elements vertically with a small gap */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* heading glow for Welcome to NEXA (neon) */
+.page h1.nexa-glow {
+  /* neon-style high-contrast green glow */
+  color: var(--text-light);
+  /* intense layered glows for a neon effect */
+  text-shadow:
+    0 0 6px rgba(var(--accent-pink-rgb), 1),
+    0 0 12px rgba(var(--accent-pink-rgb), 0.9),
+    0 0 24px rgba(var(--accent-pink-rgb), 0.75),
+    0 6px 30px rgba(var(--accent-pink-rgb), 0.45);
+  /* faster, more noticeable neon pulse */
+  animation: nexa-glow-fade 2.8s ease-in-out infinite;
+  will-change: text-shadow, transform;
+  transition: text-shadow 160ms ease;
+}
+
+@keyframes nexa-glow-fade {
+  0%, 100% {
+    text-shadow:
+      0 0 4px rgba(var(--accent-pink-rgb), 0.85),
+      0 0 10px rgba(var(--accent-pink-rgb), 0.75),
+      0 0 20px rgba(var(--accent-pink-rgb), 0.55),
+      0 4px 18px rgba(var(--accent-pink-rgb), 0.36);
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    text-shadow:
+      0 0 10px rgba(var(--accent-pink-rgb), 1),
+      0 0 22px rgba(var(--accent-pink-rgb), 0.95),
+      0 0 48px rgba(var(--accent-pink-rgb), 0.8),
+      0 8px 40px rgba(var(--accent-pink-rgb), 0.5);
+    transform: translateY(-1px) scale(1.01);
+  }
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .page h1.nexa-glow { animation: none; }
+}
+
+@media (max-width: 640px) {
+  /* reduce heavy shadows on small screens for readability/perf */
+  .page h1.nexa-glow {
+    text-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    animation: none;
+  }
+}
+  /* restore spacer when navbar is horizontal */
+  .navbar-inner .nav-spacer { display: block; flex: 1; }
+
 /* buttons */
 .btn {
-  background: var(--primary-green); color: var(--text-light);
+  background: var(--accent-pink); color: var(--text-light);
   border: 0; border-radius: 10px;
   padding: .7rem 1rem; cursor: pointer; font-weight: 600;
 }
-.btn.secondary { background: var(--accent-orange); }
+.btn.secondary { background: var(--primary-green); }
 /* Secondary (suggested prompt) hover/focus and outline */
 .btn.secondary:hover,
 .btn.secondary:focus {
@@ -83,3 +194,76 @@ body {
   border: 1px solid #cfcac0; outline: none; background: #fff;
 }
 .text-input:focus { border-color: var(--primary-dark); box-shadow: 0 0 0 3px rgba(40,70,75,.1); }
+
+/* Utility: horizontal button row and round buttons */
+.button-row {
+  display: flex;
+  gap: 12px;
+}
+/* Make buttons in a .button-row split available space evenly */
+.button-row .btn {
+  flex: 1 1 0;
+  /* min-width: 0; /* allow shrinking inside flex */
+  text-align: center;
+  /* keep the row height consistent and make children stretch to fill */
+  align-items: stretch;
+  min-height: 44px; /* ensures a stable row height */
+}
+
+/* Metrics row used on Home Quick Start */
+.metrics-row {
+  display: flex;
+  gap: 12px; /* match button-row gap so columns align */
+  justify-content: space-between; /* distribute equally across the available width */
+  align-items: center;
+  margin-top: 12px;
+}
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 0; /* take equal width like buttons */
+}
+.metric-value {
+  font-weight: 800;
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.metric-label {
+  font-size: 12px;
+  color: #222;
+}
+.metric-green { color: rgba(var(--green-shadow-rgb), 1); }
+.metric-blue { color: var(--light-accent); }
+.metric-pink { color: rgba(var(--accent-pink-rgb), 1); }
+
+@media (max-width: 640px) {
+  .metrics-row { gap: 12px; }
+  .metric-value { font-size: 20px; }
+}
+
+.btn.round {
+  border-radius: 12px;
+  padding: .45rem 1rem;
+  transition: background 150ms ease, color 150ms ease, transform 120ms ease, box-shadow 150ms ease;
+}
+.btn.round:hover,
+.btn.round:focus {
+  filter: brightness(.93);
+  outline: "var(--dark-accent)" 2px;
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px "var(--dark-accent)";
+  color: "var(--light-accent)"
+}
+.btn.round:active {
+  transform: translateY(1px);
+}
+
+.btn.round:hover,
+.btn.round:focus-visible {
+  background: var(--light-accent);
+  color: var(--text-light);
+}
+

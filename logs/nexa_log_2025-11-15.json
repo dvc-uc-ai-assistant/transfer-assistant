@@ -1,0 +1,31 @@
+[
+  {
+    "timestamp": "2025-11-16T06:26:21.446Z",
+    "session_id": "sess_bfe6023469a8",
+    "user_prompt": "What CS courses should I take at DVC for UC Berkeley?",
+    "campuses": [
+      "UCB"
+    ],
+    "response_preview": "Transfer prep for UC Berkeley:\n• COMSC-200 — Object Oriented Programming C++ (4 units)"
+  },
+  {
+    "timestamp": "2025-11-16T06:28:49.055Z",
+    "session_id": "sess_539ba798e298",
+    "user_prompt": "Show me the required courses for UCSD and UCB.",
+    "campuses": [
+      "UCB",
+      "UCSD"
+    ],
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I (5 units)\n• MATH-194/294 — Linear Algebra/Differential Equations (8 units"
+  },
+  {
+    "timestamp": "2025-11-16T06:30:45.537Z",
+    "session_id": "sess_4ba628568781",
+    "user_prompt": "Show me the required courses for UCSD and UCB.",
+    "campuses": [
+      "UCB",
+      "UCSD"
+    ],
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I (5 units)\n• MATH-194/294 — Linear Algebra/Differential Equations (8 units"
+  }
+]
