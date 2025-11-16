@@ -1,17 +1,19 @@
 # app.py  — NEXA backend (Flask)
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from openai import OpenAI
 import os
 from dotenv import load_dotenv
 from log_writer import log_event   # <-- JSON logging helper (logs/...)
 import datetime
+import subprocess
+import sys
 
 # ---------- ENV & PATHS ----------
 load_dotenv()
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REACT_DIST = os.path.join(HERE, "frontend", "dist")  # Vite build output
+AI_AGENT_PATH = os.path.join(HERE, "backend", "ai_agent.py")
 
 # ---------- FLASK APP ----------
 # (We keep static config so Flask can serve the built SPA in prod.)
@@ -26,27 +28,7 @@ CORS(app, resources={
     r"/*": {"origins": ["http://127.0.0.1:5173", "http://localhost:5173"]}
 })
 
-# ---------- OPENAI ----------
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    print("ERROR: OPENAI_API_KEY is missing. Please set it in your .env file.")
-client = OpenAI(api_key=api_key)
-
-# ---------- DATA LOAD ----------
-from backend.ai_agent import (
-    llm_parse_user_message,
-    load_all_data,
-    collect_course_rows,
-    filter_rows,
-    llm_format_response_multi,
-    parse_preferences_seed,
-    detect_campuses_from_query
-)
-
-data = load_all_data([os.path.join("agreements_25-26", "*.json")])
-print("✅ Loaded campuses:", sorted(list(data.keys())))
-if not data:
-    print("⚠️ No campus files loaded. Check the 'agreements_25-26/' directory.")
+print("[OK] Flask app initialized")
 
 # ---------- HELPERS ----------
 def new_session_id() -> str:
@@ -63,10 +45,9 @@ def health():
 
 @app.post("/prompt")
 def handle_prompt():
-    """Handles the AI prompt requests from the frontend, with session logging."""
-    if not api_key:
-        return jsonify({"error": "OPENAI_API_KEY is not configured on the server."}), 500
-
+    """
+    Handles AI prompt requests from the frontend by directly running ai_agent.py
+    """
     req_data = request.get_json(silent=True) or {}
     user_prompt = (req_data.get("prompt") or "").strip()
     session_id = (req_data.get("session_id") or "").strip() or new_session_id()
@@ -74,63 +55,55 @@ def handle_prompt():
     if not user_prompt:
         return jsonify({"error": "No prompt provided.", "session_id": session_id}), 400
 
-    # 1) Parse the user's message.
-    parsed = llm_parse_user_message(client, user_prompt)
+    try:
+        # Run ai_agent.py as subprocess with the user prompt
+        result = subprocess.run(
+            [sys.executable, AI_AGENT_PATH, user_prompt],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=HERE
+        )
 
-    # 2) Determine campuses (fall back to detection if not parsed)
-    campus_keys = parsed.get("parameters", {}).get("campuses") or detect_campuses_from_query(user_prompt)
-    campus_keys = [ck for ck in campus_keys if ck in data]
+        if result.returncode != 0:
+            error_msg = result.stderr or "Unknown error from ai_agent.py"
+            print(f"ai_agent.py error: {error_msg}")
+            return jsonify({
+                "error": f"AI Agent error: {error_msg}",
+                "session_id": session_id
+            }), 500
 
-    if not campus_keys:
-        resp_text = "Sorry, I couldn't detect a specific campus. I cover UCB, UCD, and UCSD."
+        # Get the output from ai_agent.py
+        output = result.stdout.strip()
+        
+        # The output from ai_agent is the formatted response
+        formatted_response = output if output else "No response from AI Agent"
 
-        # Log this turn (no campus detected)
+        # Log this turn
         log_event({
             "timestamp": now_iso(),
             "session_id": session_id,
             "user_prompt": user_prompt,
-            "campuses": [],
-            "response_preview": resp_text[:150]
+            "response_preview": formatted_response[:150]
         })
 
-        return jsonify({"response": resp_text, "session_id": session_id}), 200
+        # Return formatted response to chatbot
+        return jsonify({
+            "response": formatted_response,
+            "session_id": session_id
+        }), 200
 
-    # 3) Extract filters.
-    filters = parsed.get("filters", {}) or {}
-    completed_courses = set(filters.get("completed_courses", []))
-    completed_domains = set(filters.get("domains_completed", []))
-    focus_only = filters.get("focus_only")
-    required_only = filters.get("required_only", False)
-    categories_only = filters.get("categories", [])
-    seed_prefs = parse_preferences_seed(user_prompt)
-
-    # 4) Filter course data.
-    campus_to_remaining = {}
-    for ck in campus_keys:
-        all_rows = collect_course_rows(data.get(ck, {}))
-        filtered_rows = filter_rows(
-            all_rows, seed_prefs, completed_courses, completed_domains,
-            focus_only, required_only, categories_only=categories_only
-        )
-        campus_to_remaining[ck] = filtered_rows
-
-    # 5) Format the final response.
-    formatted_response = llm_format_response_multi(
-        client, campus_keys, campus_to_remaining, parsed,
-        completed_courses, completed_domains, plain=False
-    )
-
-    # 6) Log this turn (append to logs/nexa_log_YYYY-MM-DD.json)
-    log_event({
-        "timestamp": now_iso(),
-        "session_id": session_id,
-        "user_prompt": user_prompt,
-        "campuses": campus_keys,
-        "response_preview": str(formatted_response)[:150]
-    })
-
-    # 7) Send the response back to the frontend (include session_id)
-    return jsonify({"response": formatted_response, "session_id": session_id}), 200
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            "error": "AI Agent timed out. Please try again.",
+            "session_id": session_id
+        }), 500
+    except Exception as e:
+        print(f"Error in handle_prompt: {e}")
+        return jsonify({
+            "error": f"An error occurred: {str(e)}",
+            "session_id": session_id
+        }), 500
 
 # ---------- SPA STATIC (when serving build via Flask) ----------
 @app.get("/")
