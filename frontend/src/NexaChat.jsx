@@ -9,6 +9,47 @@ const suggestedPrompts = [
   "I've completed Math 192, what does that cover at UCB?",
 ];
 
+// Typing indicator component with animated dots
+function TypingIndicator() {
+  const dotStyle = {
+    width: "0.5rem",
+    height: "0.5rem",
+    borderRadius: "50%",
+    backgroundColor: "var(--accent-pink)",
+    animation: "bounce 1.4s infinite",
+    display: "inline-block"
+  };
+
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "0.25rem",
+      padding: "0.5rem 0"
+    }}>
+      <style>{`
+        @keyframes bounce {
+          0%, 80%, 100% {
+            transform: translateY(0);
+            opacity: 0.6;
+          }
+          40% {
+            transform: translateY(-0.5rem);
+            opacity: 1;
+          }
+        }
+        .dot-1 { animation-delay: 0s !important; }
+        .dot-2 { animation-delay: 0.2s !important; }
+        .dot-3 { animation-delay: 0.4s !important; }
+      `}</style>
+      <div className="dot-1" style={dotStyle} />
+      <div className="dot-2" style={dotStyle} />
+      <div className="dot-3" style={dotStyle} />
+    </div>
+  );
+}
+
+
 export default function NexaChat() {
   const [messages, setMessages] = useState([
     // The initial message now contains the prompts
@@ -182,6 +223,22 @@ export default function NexaChat() {
             </div>
           </div>
         ))}
+        {loading && (
+          <div style={{
+            display: "flex",
+            justifyContent: "flex-start",
+            marginBottom: "0.5rem"
+          }}>
+            <div style={{
+              padding: "0.875rem 1rem",
+              borderRadius: "12px",
+              backgroundColor: "white",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.08)"
+            }}>
+              <TypingIndicator />
+            </div>
+          </div>
+        )}
         <div ref={chatEndRef} />
       </div>
 
