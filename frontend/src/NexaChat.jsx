@@ -76,53 +76,110 @@ export default function NexaChat() {
   }
 
   return (
-    <div className="chat-card">
-      <div className="chat-header" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <strong>NEXA Chatbot</strong>
+    <div className="chat-card" style={{
+      display: "flex",
+      flexDirection: "column",
+      height: "70vh",
+      backgroundColor: "white",
+      borderRadius: "16px",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+      overflow: "hidden",
+      border: "1px solid #e0e0e0"
+    }}>
+      <div className="chat-header" style={{ 
+        display: "flex", 
+        alignItems: "center", 
+        gap: 8, 
+        flexWrap: "wrap",
+        padding: "1.25rem 1.5rem",
+        background: "linear-gradient(135deg, var(--accent-pink), var(--dark-accent))",
+        color: "white"
+      }}>
+        <strong style={{ fontSize: "1.1rem" }}>💬 NEXA Chat</strong>
         <span
           style={{
             marginLeft: 8,
-            padding: "2px 8px",
+            padding: "4px 12px",
             fontSize: 12,
             borderRadius: 999,
-            background: "rgba(255,255,255,.18)",
-            border: "1px solid rgba(255,255,255,.35)"
+            background: "rgba(255,255,255,.2)",
+            border: "1px solid rgba(255,255,255,.4)",
+            fontWeight: "500"
           }}
           title="Currently supports UC Berkeley, UC Davis, and UC San Diego."
         >
-          UCB · UCD · UCSD only
+          UCB · UCD · UCSD
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <button className="btn" onClick={checkHealth}>Health</button>
+          <button className="btn" onClick={checkHealth} style={{
+            backgroundColor: "rgba(255,255,255,0.2)",
+            color: "white",
+            border: "1px solid rgba(255,255,255,0.3)",
+            borderRadius: "6px",
+            padding: "6px 12px",
+            fontSize: "12px",
+            cursor: "pointer",
+            transition: "all 0.2s ease"
+          }}>Health</button>
         </div>
       </div>
 
-      <div className="chat-window">
+      <div className="chat-window" style={{
+        flex: 1,
+        overflowY: "auto",
+        padding: "1.5rem",
+        backgroundColor: "#fafafa",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem"
+      }}>
         {/* Updated rendering logic for messages */}
         {messages.map((m, i) => (
-          <div key={i} className={`msg ${m.role === "user" ? "user" : "bot"}`}>
-            {m.content}
-            {/* Render buttons if the message has prompts */}
-            {m.prompts && (
-              <div className="suggested-prompts-in-message" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
-                {m.prompts.map((prompt, j) => (
-                  <button
-                    key={j}
-                    className="btn secondary" // Use the theme's .btn.secondary (orange)
-                    onClick={() => sendMessage(prompt)}
-                    disabled={loading}
-                    // Add "round" style and override padding for a better look
-                    style={{
-                      borderRadius: '999px', // Makes the button pill-shaped
-                      padding: '6px 14px',
-                      fontSize: '13px'
-                    }}
-                  >
-                    {prompt}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div key={i} style={{
+            display: "flex",
+            justifyContent: m.role === "user" ? "flex-end" : "flex-start",
+            marginBottom: "0.5rem"
+          }}>
+            <div className={`msg ${m.role === "user" ? "user" : "bot"}`} style={{
+              maxWidth: "75%",
+              padding: "0.875rem 1rem",
+              borderRadius: "12px",
+              backgroundColor: m.role === "user" ? "var(--accent-pink)" : "white",
+              color: m.role === "user" ? "white" : "var(--primary-dark)",
+              boxShadow: m.role === "user" ? "0 2px 8px rgba(224, 114, 164, 0.2)" : "0 2px 8px rgba(0,0,0,0.08)",
+              fontSize: "0.95rem",
+              lineHeight: "1.5"
+            }}>
+              {m.content}
+              {m.prompts && (
+                <div className="suggested-prompts-in-message" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                  {m.prompts.map((prompt, j) => (
+                    <button
+                      key={j}
+                      onClick={() => sendMessage(prompt)}
+                      disabled={loading}
+                      style={{
+                        borderRadius: '8px',
+                        padding: '8px 12px',
+                        fontSize: '13px',
+                        backgroundColor: "var(--primary-green)",
+                        color: "var(--primary-dark)",
+                        border: "none",
+                        cursor: loading ? "not-allowed" : "pointer",
+                        transition: "all 0.2s ease",
+                        fontWeight: "500",
+                        textAlign: "left",
+                        opacity: loading ? 0.6 : 1
+                      }}
+                      onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = "var(--green-shadow)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--primary-green)")}
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ))}
         <div ref={chatEndRef} />
@@ -131,15 +188,50 @@ export default function NexaChat() {
       <form
         className="input-row"
         onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
+        style={{
+          display: "flex",
+          gap: "0.75rem",
+          padding: "1.25rem 1.5rem",
+          backgroundColor: "white",
+          borderTop: "1px solid #e0e0e0"
+        }}
       >
         <input
           className="text-input"
           type="text"
-          placeholder="Type your question…"
+          placeholder="Ask me anything about transfers…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          style={{
+            flex: 1,
+            padding: "0.75rem 1rem",
+            borderRadius: "8px",
+            border: "1px solid #d0d0d0",
+            fontSize: "0.95rem",
+            fontFamily: "inherit",
+            transition: "border-color 0.2s ease"
+          }}
+          onFocus={(e) => e.currentTarget.style.borderColor = "var(--accent-pink)"}
+          onBlur={(e) => e.currentTarget.style.borderColor = "#d0d0d0"}
         />
-        <button className="btn" type="submit" disabled={loading}>
+        <button 
+          className="btn" 
+          type="submit" 
+          disabled={loading}
+          style={{
+            padding: "0.75rem 1.5rem",
+            backgroundColor: loading ? "#ccc" : "var(--accent-pink)",
+            color: "white",
+            border: "none",
+            borderRadius: "8px",
+            cursor: loading ? "not-allowed" : "pointer",
+            fontWeight: "600",
+            transition: "all 0.2s ease",
+            opacity: loading ? 0.7 : 1
+          }}
+          onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = "#d4509f")}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--accent-pink)")}
+        >
           {loading ? "…" : "Send"}
         </button>
       </form>
