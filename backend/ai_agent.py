@@ -2,7 +2,7 @@
 # Scope: Transfer-only; Campuses: UCB / UCD / UCSD
 # Adds: Multi-campus selection + Category filtering (to merge Dani's + Eleni's approaches)
 
-import os, json, glob, re, csv, argparse, uuid
+import os, json, glob, re, csv, argparse, uuid, sys
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 from dotenv import load_dotenv
@@ -159,7 +159,7 @@ def parse_preferences_seed(q: str) -> dict:
         "want_cs": want_cs,
         "want_math": want_math,
         "want_science": want_science,
-        "seed_categories": seed_categories,  
+        "seed_categories": seed_categories if not (want_cs or want_math or want_science) else [],  # Clear seed categories if domain is specified  
     }
 
 #load/collect/filter data
@@ -324,14 +324,15 @@ def filter_rows(rows: List[Dict[str, Any]],
             if not (mr == "all" or (mr.isdigit() and int(mr) > 0)):
                 continue
 
-        #seed prefs domain-exclusive
+        #seed prefs domain-exclusive (only apply if LLM didn't already set focus_only)
         exclusive = seed_prefs.get("exclusive_domain")
-        if exclusive == "cs" and not is_cs_row(r):
-            continue
-        if exclusive == "math" and not is_math_row(r):
-            continue
-        if exclusive == "science" and not is_science_row(r):
-            continue
+        if focus_only is None:
+            if exclusive == "cs" and not is_cs_row(r):
+                continue
+            if exclusive == "math" and not is_math_row(r):
+                continue
+            if exclusive == "science" and not is_science_row(r):
+                continue
 
         #new: categories filter (Leni merge)
         if not _row_matches_any_category(r, categories_only):
@@ -445,10 +446,19 @@ def llm_parse_user_message(client: OpenAI, user_message: str) -> Dict[str, Any]:
         filt["completed_courses"] = sorted(norm)
 
         #new: categories (LLM + local merge)
+        # Don't include categories if focus_only is already set (CS/Math/Science)
+        focus = filt.get("focus_only")
+        focus = focus.lower().strip() if isinstance(focus, str) else None
+        
         cats = filt.get("categories") or []
         cats = cats if isinstance(cats, list) else []
         cats_local = normalize_categories_freeform(user_message)
         merged_cats = sorted(set([c for c in cats if isinstance(c, str) and c.strip()] + cats_local))
+        
+        # Clear categories if a domain focus is already set
+        if focus in {"cs", "math", "science"}:
+            merged_cats = []
+        
         filt["categories"] = merged_cats
 
         return data
@@ -833,6 +843,7 @@ def main():
         return
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("prompt", nargs="?", default=None, help="User prompt to process")
     parser.add_argument("--demo", action="store_true", help="Show BEFORE (parser JSON) → AFTER (formatted) and log paths.")
     parser.add_argument("--plain", action="store_true", help="Bypass LLM formatter and use deterministic bullets.")
     parser.add_argument("--json-only", action="store_true", help="Only print parser JSON and exit.")
@@ -845,21 +856,97 @@ def main():
         os.path.join("data", "uc*.json"),
         os.path.join("agreements_25-26", "*.json"),
     ])
-    print("✅ Loaded campuses:", sorted(list(data.keys())))
-    print(f"CSV log → {LOG_CSV}")
-    print(f"JSONL log → {LOG_JSONL}")
+    print("[OK] Loaded campuses:", sorted(list(data.keys())), file=sys.stderr)
+    print(f"CSV log: {LOG_CSV}", file=sys.stderr)
+    print(f"JSONL log: {LOG_JSONL}", file=sys.stderr)
     if not data:
-        print("⚠️ No campus files loaded. Check data/ and agreements_25-26/")
+        print("[WARNING] No campus files loaded. Check data/ and agreements_25-26/", file=sys.stderr)
         return
 
     #normalize CLI campuses now
     if args.campuses:
         args.campuses = parse_cli_campuses(args.campuses)
         if args.campuses:
-            print("CLI campuses →", ", ".join(PRETTY_CAMPUS[c] for c in args.campuses))
+            print("CLI campuses:", ", ".join(PRETTY_CAMPUS[c] for c in args.campuses), file=sys.stderr)
         else:
-            print("CLI campuses → none recognized; falling back to parsed input")
+            print("CLI campuses: none recognized; falling back to parsed input", file=sys.stderr)
 
+    # If prompt is provided as argument (from Flask), process it directly
+    if args.prompt:
+        user_q = args.prompt
+        query_id = 1
+        
+        # When called from Flask as subprocess, use plain formatting for consistency
+        use_plain = True
+        
+        parsed = llm_parse_user_message(client, user_q)
+        if args.json_only:
+            print(json.dumps(parsed, indent=2, ensure_ascii=False))
+            campus_keys_for_log = parsed.get("parameters", {}).get("campuses") or list(data.keys())
+            campus_key_for_log = (campus_keys_for_log[0] if campus_keys_for_log else (next(iter(data.keys())) if data else "UCB"))
+            append_logs(user_q, parsed, "", campus_key_for_log, [], set(), set(), query_id)
+            return
+
+        #campuses for this session
+        campus_keys = []
+        if args.campuses:
+            campus_keys = [ck for ck in args.campuses if ck in data]
+        if not campus_keys:
+            campus_keys = parsed.get("parameters", {}).get("campuses") or detect_campuses_from_query(user_q)
+        if not campus_keys:
+            print("Sorry, I couldn't detect a campus. Try UC Berkeley (UCB), UC Davis (UCD), or UC San Diego (UCSD).")
+            return
+        campus_keys = [ck for ck in campus_keys if ck in data]
+        if not campus_keys:
+            print("Could not find data for the requested campus(es).")
+            return
+
+        #persistent state across the session
+        seed_prefs = parse_preferences_seed(user_q)
+        completed_courses: Set[str] = set(parsed["filters"]["completed_courses"])
+        completed_domains: Set[str] = set(parsed["filters"]["domains_completed"])
+        focus_only = parsed["filters"]["focus_only"]
+        required_only = parsed["filters"]["required_only"]
+        categories_only: List[str] = parsed["filters"].get("categories") or seed_prefs.get("seed_categories") or []
+
+        campus_to_all_rows: Dict[str, List[Dict[str, Any]]] = {ck: collect_course_rows(data[ck]) for ck in campus_keys}
+
+        def recompute_remaining() -> Dict[str, List[Dict[str, Any]]]:
+            out: Dict[str, List[Dict[str, Any]]] = {}
+            for ck in campus_keys:
+                rows = campus_to_all_rows.get(ck, [])
+                out[ck] = filter_rows(rows, seed_prefs, completed_courses, completed_domains,
+                                      focus_only, required_only, categories_only=categories_only)
+            return out
+
+        campus_to_remaining = recompute_remaining()
+
+        # Format and output the response
+        formatted = llm_format_response_multi(
+            client,
+            campus_keys,
+            campus_to_remaining,
+            parsed,
+            completed_courses,
+            completed_domains,
+            plain=use_plain
+        )
+        print(formatted)
+        
+        # Log this query
+        append_logs(
+            user_q,
+            parsed,
+            formatted,
+            "MULTI:" + ",".join(campus_keys),
+            [r for ck in campus_keys for r in campus_to_remaining.get(ck, [])],
+            completed_courses,
+            completed_domains,
+            query_id
+        )
+        return
+
+    # Interactive mode if no prompt provided
     while True:
         try:
             interactive_session(client, data, args)

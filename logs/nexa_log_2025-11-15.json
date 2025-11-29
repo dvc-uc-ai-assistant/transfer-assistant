@@ -27,5 +27,45 @@
       "UCSD"
     ],
     "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I (5 units)\n• MATH-194/294 — Linear Algebra/Differential Equations (8 units"
+  },
+  {
+    "timestamp": "2025-11-16T07:02:25.666Z",
+    "session_id": "sess_cc39a7ee4606",
+    "user_prompt": "Show me the required courses for UCSD and UCB.",
+    "campuses": [
+      "UCB",
+      "UCSD"
+    ],
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I (5 units)\n• MATH-194/294 — Linear Algebra/Differential Equations (8 units"
+  },
+  {
+    "timestamp": "2025-11-16T07:13:01.609Z",
+    "session_id": "sess_a37e6eeeb3ee",
+    "user_prompt": "Show me the required courses for UCSD and UCB.",
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I (5 units)\n• MATH-194/294 — Linear Algebra/Differential Equations (8 units"
+  },
+  {
+    "timestamp": "2025-11-16T07:15:33.554Z",
+    "session_id": "sess_dde2d0479861",
+    "user_prompt": "what are the course requirements for ucsd and ucb?",
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I (5 units)\n• MATH-194/294 — Linear Algebra/Differential Equations (8 units"
+  },
+  {
+    "timestamp": "2025-11-16T07:18:58.553Z",
+    "session_id": "sess_45cc1882109a",
+    "user_prompt": "Show me the required courses for UCSD and UCB.",
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I (5 units)\n• MATH-194/294 — Linear Algebra/Differential Equations (8 units"
+  },
+  {
+    "timestamp": "2025-11-16T07:28:18.700Z",
+    "session_id": "sess_281db9bcb8f9",
+    "user_prompt": "Show me the required courses for UCSD and UCB.",
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-194/294 — Linear Algebra/Differential Equations — 8 unit"
+  },
+  {
+    "timestamp": "2025-11-16T07:28:37.945Z",
+    "session_id": "sess_309ad84271fe",
+    "user_prompt": "what are the math requirements for ucb",
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-194/294 — Linear Algebra/Differential Equations — 8 unit"
   }
 ]
