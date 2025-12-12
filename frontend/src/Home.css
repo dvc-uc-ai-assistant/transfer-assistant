@@ -1,0 +1,92 @@
+/* Home.css - responsive layout for Home page */
+
+.home-hero {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: nowrap;
+  min-height: 60vh;
+}
+.hero-left {
+  flex: 1 1 50%;
+  max-width: 50%;
+  min-width: 0;
+  padding: 0 40px;
+  box-sizing: border-box;
+}
+.quick-start-col {
+  flex: 1 1 50%;
+  max-width: 50%;
+  min-width: 0;
+  margin-top: 0;
+  padding: 0 40px;
+  box-sizing: border-box;
+}
+.quick-start-card {
+  margin-top: 0;
+  padding: 32px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: var(--bg-color);
+  color: var(--primary-dark);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+.quick-start-title {
+  margin-top: 0;
+  text-align: center;
+  color: var(--dark-accent);
+  font-size: 35px;
+}
+
+/* Mobile */
+@media (max-width: 860px) {
+  .home-hero {
+    flex-direction: column; /* keep normal document order so Quick Start is below hero */
+    gap: 12px;
+    align-items: stretch;
+  }
+  .hero-left, .quick-start-col { flex: 1 1 100%; max-width: 100%; padding: 0 16px; }
+  .quick-start-card { padding: 16px; border-radius: 10px; }
+  .quick-start-title { font-size: 22px; }
+  .metrics-row { gap: 8px; }
+  .metric-value { font-size: 20px; }
+  .button-row .btn { padding: 0.6rem 0.8rem; font-size: 0.95rem; }
+}
+
+/* Make buttons wrap when needed so we can reliably trigger the breakpoint above
+   when the quick-start column becomes too narrow to host them in a single row. */
+.button-row {
+  display: flex;
+  gap: 12px;
+  /* keep horizontal by default */
+  flex-wrap: nowrap;
+  align-items: center;
+}
+.button-row .btn { min-width: 140px; /* don't force equal widths on desktop */
+  flex: 0 1 auto;
+}
+/* Immediately drop Quick Start below the hero at laptop/small-laptop widths */
+@media (max-width: 1200px) {
+  .home-hero {
+    flex-direction: column; /* Quick Start moves below the hero content */
+    gap: 12px;
+    align-items: stretch;
+  }
+  .hero-left, .quick-start-col {
+    flex: 1 1 100%;
+    max-width: 100%;
+    padding: 0 16px;
+  }
+  .quick-start-card { padding: 16px; border-radius: 10px; }
+  /* Buttons should wrap / become full-width when the card drops below */
+  .button-row { flex-wrap: wrap; }
+  .button-row .btn { flex: 1 1 100%; min-width: 0; }
+}
+
+/* Maintain extra small-screen tweaks */
+@media (max-width: 860px) {
+  .quick-start-title { font-size: 22px; }
+  .metrics-row { gap: 8px; }
+  .metric-value { font-size: 20px; }
+  .button-row .btn { padding: 0.6rem 0.8rem; font-size: 0.95rem; }
+}
