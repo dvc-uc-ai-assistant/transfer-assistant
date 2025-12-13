@@ -150,7 +150,7 @@ def parse_preferences_seed(q: str) -> dict:
     elif want_science and not (want_cs or want_math):
         exclusive_domain = "science"
 
-    #new: seed categories 
+    #new: seed categories; keep them unless we have an exclusive domain
     seed_categories = normalize_categories_freeform(q)
 
     return {
@@ -159,7 +159,9 @@ def parse_preferences_seed(q: str) -> dict:
         "want_cs": want_cs,
         "want_math": want_math,
         "want_science": want_science,
-        "seed_categories": seed_categories if not (want_cs or want_math or want_science) else [],  # Clear seed categories if domain is specified  
+        # only clear categories when exactly one domain is singled out; keep them for mixed intents like
+        # "science courses for computer science" so science filtering still applies
+        "seed_categories": [] if exclusive_domain else seed_categories,
     }
 
 #load/collect/filter data
@@ -371,7 +373,10 @@ def llm_parse_user_message(client: OpenAI, user_message: str) -> Dict[str, Any]:
         "parameters.campuses: ARRAY of campuses (UCB, UCD, UCSD) if multiple are requested (else empty).\n"
         "parameters.target_course_code: only if user asks about a UC target (e.g., 'CS 61A') for equivalency.\n"
         "parameters.target_institution: the UC campus name if mentioned (e.g., 'UC Berkeley').\n"
-        "filters.focus_only: one of 'cs','math','science','all', or null.\n"
+        "filters.focus_only: one of 'cs','math','science','all', or null. "
+        "IMPORTANT: If the user asks for a subset like 'science courses for computer science' or 'math requirements for CS', "
+        "set focus_only to the SUBSET domain (e.g., 'science' or 'math'), NOT the major context (CS). "
+        "The major context provides background but the actual filter is the course type requested.\n"
         "filters.required_only: boolean.\n"
         "filters.domains_completed: list among 'cs','math','science'.\n"
         "filters.completed_courses: array of normalized DVC course codes (DEPT-NUM) if the user lists them.\n"
