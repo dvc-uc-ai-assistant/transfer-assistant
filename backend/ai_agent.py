@@ -250,10 +250,11 @@ def is_science_row(row: dict) -> bool:
     cat = (row.get("category") or "").lower()
     return (
         code.startswith(("PHYS-", "CHEM-", "BIOSC-", "BIOL-"))
+        # avoid misclassifying Computer Science as science based on category text
+        or ("science" in cat and "computer science" not in cat)
         or "physics" in cat
         or "chemistry" in cat
         or "biology" in cat
-        or "science" in cat
     )
 
 def _row_matches_any_category(row: dict, categories: List[str]) -> bool:
