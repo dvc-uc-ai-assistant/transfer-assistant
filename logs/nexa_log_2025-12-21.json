@@ -1,0 +1,122 @@
+[
+  {
+    "timestamp": "2025-12-21T19:16:39.451Z",
+    "session_id": "sess_cc27a7de1e33",
+    "user_prompt": "Show me the required courses for UCSD and UCB.",
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-193 — Analytic Geometry and Calculus II — 5 units\n• COMS"
+  },
+  {
+    "timestamp": "2025-12-21T19:16:56.623Z",
+    "session_id": "sess_c447c9787495",
+    "user_prompt": "I've completed Math 192, what does that cover at UCB?",
+    "response_preview": "Transfer prep for UC Berkeley:\n(excluding completed domains: none; completed courses: MATH-192)\n• MATH-193 — Analytic Geometry and Calculus II — 5 uni"
+  },
+  {
+    "timestamp": "2025-12-21T19:27:18.008Z",
+    "session_id": "sess_4c318eee9c17",
+    "user_prompt": "Show me the required courses for UCSD and UCB.",
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-"
+  },
+  {
+    "timestamp": "2025-12-21T19:27:48.836Z",
+    "session_id": "sess_13159f93f506",
+    "user_prompt": "what science courses are required for computer science at uc davis",
+    "response_preview": "Transfer prep for UC Davis:\n• BIOSC-130 — Principles of Cellular and Molecular Biology/Principles of Organismal Biology, Evolution, and Ecology — 10 u"
+  },
+  {
+    "timestamp": "2025-12-21T19:28:13.139Z",
+    "session_id": "sess_b07296d32179",
+    "user_prompt": "what courses are required at uc davis",
+    "response_preview": "Transfer prep for UC Davis:\n• MATH-195 — Discrete Mathematics — 4 units\n• COMSC-110 — Introduction to Programming — 4 units\n• COMSC-165 — Advanced Pro"
+  },
+  {
+    "timestamp": "2025-12-21T19:28:30.856Z",
+    "session_id": "sess_d6b498e46cd7",
+    "user_prompt": "what science courses are required for computer science at uc san diego",
+    "response_preview": "Transfer prep for UC San Diego:\nNo DVC course mappings found."
+  },
+  {
+    "timestamp": "2025-12-21T19:28:55.568Z",
+    "session_id": "sess_86c30081b78a",
+    "user_prompt": "what courses are required at uc san diego",
+    "response_preview": "Transfer prep for UC San Diego:\n• COMSC-171 — Introduction to UNIX and Linux/Programming with Java — 4 units\n• 255 — Introduction to UNIX and Linux/Pr"
+  },
+  {
+    "timestamp": "2025-12-21T21:00:42.622Z",
+    "session_id": "sess_1066dfc97e54",
+    "user_prompt": "Show me the required courses for UCSD and UCB.",
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-"
+  },
+  {
+    "timestamp": "2025-12-21T21:01:04.227Z",
+    "session_id": "sess_fb54f59976b8",
+    "user_prompt": "how many courses are required for ucsd",
+    "response_preview": "Transfer prep for UC San Diego:\n• COMSC-171/255 — Introduction to UNIX and Linux/Programming with Java — 4 units\n• COMSC-200 — Object Oriented Program"
+  },
+  {
+    "timestamp": "2025-12-21T21:01:33.389Z",
+    "session_id": "sess_37b98be22b5b",
+    "user_prompt": "show me the math courses only",
+    "response_preview": "Sorry, I couldn't detect a campus. Try UC Berkeley (UCB), UC Davis (UCD), or UC San Diego (UCSD)."
+  },
+  {
+    "timestamp": "2025-12-21T22:24:38.238Z",
+    "session_id": "sess_8d5f548f541e",
+    "user_prompt": "What math courses do I need for UC Davis?",
+    "response_preview": "Transfer prep for UC Davis:\n• MATH-195 — Discrete Mathematics — 4 units\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-193 — Analytic "
+  },
+  {
+    "timestamp": "2025-12-21T22:24:56.734Z",
+    "session_id": "sess_94612566b983",
+    "user_prompt": "What computer science courses do I need for UC Berkeley?",
+    "response_preview": "Transfer prep for UC Berkeley:\nNo DVC course mappings found."
+  },
+  {
+    "timestamp": "2025-12-21T22:25:35.280Z",
+    "session_id": "sess_db0f7952bc44",
+    "user_prompt": "What courses do I need for UC Berkeley?",
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-"
+  },
+  {
+    "timestamp": "2025-12-21T22:28:01.717Z",
+    "session_id": "sess_25d39b27057e",
+    "user_prompt": "Show me the required courses for UCSD and UCB.",
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-"
+  },
+  {
+    "timestamp": "2025-12-21T22:28:26.499Z",
+    "session_id": "sess_3a4a1191b417",
+    "user_prompt": "I've completed Math 192, what does that cover at UCB?",
+    "response_preview": "Transfer prep for UC Berkeley:\n(excluding completed domains: none; completed courses: MATH-192)\n• MATH-194/294 — Linear Algebra/Differential Equations"
+  },
+  {
+    "timestamp": "2025-12-21T22:28:56.014Z",
+    "session_id": "sess_4c39514efb12",
+    "user_prompt": "What Science courses are required for Computer Science at UC Davis?",
+    "response_preview": "Transfer prep for UC Davis:\nNo DVC course mappings found."
+  },
+  {
+    "timestamp": "2025-12-21T22:29:11.848Z",
+    "session_id": "sess_978237e6b86b",
+    "user_prompt": "what science courses are required for computer science at ucsd",
+    "response_preview": "Transfer prep for UC San Diego:\nNo DVC course mappings found."
+  },
+  {
+    "timestamp": "2025-12-21T22:38:06.498Z",
+    "session_id": "sess_3c186af8d850",
+    "user_prompt": "Show me the required courses for UCSD and UCB.",
+    "response_preview": "Transfer prep for UC Berkeley:\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-192 — Analytic Geometry and Calculus I — 5 units\n• MATH-"
+  },
+  {
+    "timestamp": "2025-12-21T22:38:22.590Z",
+    "session_id": "sess_2006f67fab3e",
+    "user_prompt": "What Science courses are required for Computer Science at UC Davis?",
+    "response_preview": "Transfer prep for UC Davis:\n• BIOSC-130 — Principles of Cellular and Molecular Biology — 5 units\n• BIOSC-131 — Principles of Organismal Biology, Evolu"
+  },
+  {
+    "timestamp": "2025-12-21T22:38:50.130Z",
+    "session_id": "sess_656f3083f8a3",
+    "user_prompt": "what science courses are required for computer science at ucsd",
+    "response_preview": "Transfer prep for UC San Diego:\n• BIOSC-130/131 — Principles of Cellular and Molecular Biology/Principles of Organismal Biology, Evolution, and Ecolog"
+  }
+]

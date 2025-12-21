@@ -4,8 +4,9 @@
             "Year": "2025-2026"
         },
         {
-            "Category": "Mathematics (Required for Admission)",
-            "Minimum_Required": "all",
+            "Category": "Mathematics Requirements",
+            "Minimum_Required": 3,
+            "Description": "All 3 Mathematics courses are required for admission",
             "Courses": [
                 {
                     "UC_Berkeley": {
@@ -46,8 +47,9 @@
             ]
         },
         {
-            "Category": "Highly Recommended",
-            "Minimum_Required": "None",
+            "Category": "Computer Science Requirements (Highly Recommended)",
+            "Minimum_Required": 0,
+            "Description": "These 3 Computer Science courses are highly recommended but not required",
             "Courses": [
                 {
                     "UC_Berkeley": {
