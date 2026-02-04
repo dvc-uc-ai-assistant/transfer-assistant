@@ -326,8 +326,12 @@ def llm_format_response(client: OpenAI,
     campus_name = PRETTY_CAMPUS.get(campus_key, campus_key)
     items = []
     for r in rows:
+        course_code = (r.get("dvc_code") or "").strip()
+        # Skip entries without a course code
+        if not course_code:
+            continue
         items.append({
-            "course": (r.get("dvc_code") or "").strip(),
+            "course": course_code,
             "title": (r.get("dvc_title") or "").strip(),
             "units": r.get("dvc_units", "")
         })
@@ -482,6 +486,14 @@ def parse_cli_campuses(opt_str: Optional[str]) -> List[str]:
         if det in PRETTY_CAMPUS:
             out.append(det)
     return sorted(set(out))
+
+# helper: clarifying prompt when campus is missing
+def format_campus_clarifier() -> str:
+    campus_opts = ", ".join(f"{name} ({code})" for code, name in PRETTY_CAMPUS.items())
+    return (
+        "I can help with these campuses: "
+        f"{campus_opts}. Which campus should I use? You can reply with a campus name or code (e.g., 'UCD')."
+    )
 
 # helper: resolve categories to apply
 def resolve_categories_only(parsed_filters: Dict[str, Any], seed_prefs: Dict[str, Any]) -> List[str]:

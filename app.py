@@ -3,7 +3,6 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
-from log_writer import log_event   # <-- JSON logging helper (logs/...)
 import datetime
 import subprocess
 import sys
@@ -11,9 +10,10 @@ import sys
 # ---------- ENV & PATHS ----------
 load_dotenv()
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-REACT_DIST = os.path.join(HERE, "frontend", "dist")  # Vite build output
-AI_AGENT_PATH = os.path.join(HERE, "backend", "ai_agent.py")
+# Current directory is root
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+REACT_DIST = os.path.join(ROOT_DIR, "frontend", "dist")  # Vite build output
+AI_AGENT_PATH = os.path.join(ROOT_DIR, "backend", "ai_agent.py")
 
 # ---------- FLASK APP ----------
 # (We keep static config so Flask can serve the built SPA in prod.)
@@ -62,7 +62,7 @@ def handle_prompt():
             capture_output=True,
             text=True,
             timeout=60,
-            cwd=HERE
+            cwd=ROOT_DIR
         )
 
         if result.returncode != 0:
@@ -78,14 +78,6 @@ def handle_prompt():
         
         # The output from ai_agent is the formatted response
         formatted_response = output if output else "No response from AI Agent"
-
-        # Log this turn
-        log_event({
-            "timestamp": now_iso(),
-            "session_id": session_id,
-            "user_prompt": user_prompt,
-            "response_preview": formatted_response[:150]
-        })
 
         # Return formatted response to chatbot
         return jsonify({
