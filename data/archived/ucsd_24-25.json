@@ -4,8 +4,9 @@
             "Year": "2025-2026"
         },
         {
-            "Category": "Lower Division Major Requirements",
-            "Minimum_Required": "all",
+            "Category": "Computer Science Requirements",
+            "Minimum_Required": 6,
+            "Description": "All 6 Computer Science courses are required",
             "Courses": [
                 {
                     "UC_SanDiego": {
@@ -90,7 +91,14 @@
                         "Title": "Assembly Language Programming/Computer Organization",
                         "Units": 4
                     }
-                },
+                }
+            ]
+        },
+        {
+            "Category": "Mathematics Requirements",
+            "Minimum_Required": 4,
+            "Description": "All 4 Mathematics courses are required",
+            "Courses": [
                 {
                     "UC_SanDiego": {
                         "Course_Code": "MATH-18",
@@ -142,8 +150,9 @@
             ]
         },
         {
-            "Category": "Select 1 course from the following",
+            "Category": "Science Requirements",
             "Minimum_Required": 1,
+            "Description": "Select 1 course from Biology, Chemistry, or Physics",
             "Courses": [
                 {
                     "UC_SanDiego": {
