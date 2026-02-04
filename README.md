@@ -1,4 +1,4 @@
-
+Hi test 1 for Local
 # Transfer Assistant — DVC → UC (LLM-assisted transfer helper)
 
 This repository contains a small assistant that helps Diablo Valley College (DVC) students plan UC transfer preparation for a subset of UC campuses (UCB, UCD, UCSD).
