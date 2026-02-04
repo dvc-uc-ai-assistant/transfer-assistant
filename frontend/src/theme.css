@@ -1,18 +1,19 @@
 :root{
-  --bg-color: #9676A7;
-  --primary-dark: #3b3028;
-  --primary-dark-rgb: 28,15,19;
-  --nav-width: 220px;
-  --page-gutter: 3rem; /* visible gutter between sidebar and page */
-  --primary-green: #D897B1;
-  --accent-pink: #D6CBE8;
-  --text-light: #f9f9f9;
-  --container-bg: #FE9ABD;
-  --light-accent: #D4FFC2;
-  --dark-accent: #E6B84C;
-  --green-shadow: #498F28;
-  --green-shadow-rgb: 73,143,40;
-  --accent-pink-rgb: 224,114,164;
+  --bg-color: #f8f6fc;
+  --primary-dark: #1a1a1a;
+  --primary-dark-rgb: 26,26,26;
+  --nav-width: 180px;
+  --page-gutter: 2rem; /* visible gutter between sidebar and page */
+  --primary-pink: #d084d4;
+  --accent-pink: #e8a7e8;
+  --text-light: #ffffff;
+  --container-bg: #f5f0fc;
+  --light-accent: #f0e6f5;
+  --dark-accent: #a855d8;
+  --purple-accent: #8b5cf6;
+  --teal-accent: #06b6d4;
+  --purple-accent-rgb: 139,92,246;
+  --accent-pink-rgb: 224,132,212;
 }
 
 /* base */
@@ -21,7 +22,8 @@ body {
   margin: 0;
   background: var(--bg-color);
   color: var(--primary-dark);
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  letter-spacing: -0.01em;
 }
 
 /* layout shell */
@@ -46,41 +48,47 @@ body {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0.5rem;
+  gap: 0.25rem;
   /* keep the inner card full height of the sidebar */
   width: 100%;
   height: 100%;
   /* reduce top padding so nav links sit higher in the sidebar */
-  padding: 1rem 1rem 2rem 1rem;
-  background: linear-gradient(180deg, rgba(var(--primary-dark-rgb),0.98), rgba(var(--primary-dark-rgb),0.94));
-  color: var(--text-light);
-  border-radius: 0 14px 14px 0; /* rounded on the right side only */
-  box-shadow: 8px 0 28px rgba(0,0,0,0.18);
-  border-right: 1px solid rgba(255,255,255,0.03);
+  padding: 1.5rem 0.75rem 2rem 0.75rem;
+  background: #f5f0fc;
+  color: var(--primary-dark);
+  border-radius: 0;
+  box-shadow: 1px 0 8px rgba(0,0,0,0.06);
+  border-right: 1px solid #e8d4f1;
 }
-.nav-title { margin: 0 0 .4rem 0; font-size: 1.15rem; font-weight: 800; letter-spacing: .2px; text-align: left; }
+.nav-header { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin: 0 0 1rem 0; }
+.nav-logo { width: 32px; height: 32px; object-fit: contain; flex-shrink: 0; }
+.nav-title { margin: 0; font-size: 0.95rem; font-weight: 700; letter-spacing: 1px; color: var(--dark-accent); text-transform: uppercase; }
 .nav-spacer { flex: 1; }
 .navbar-inner .nav-spacer { display: none; }
 .nav-link {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: .6rem;
   width: 100%;
-  color: var(--text-light);
+  color: var(--primary-dark);
   text-decoration: none;
   padding: .6rem .8rem;
-  border-radius: .6rem;
-  font-weight: 700;
-  opacity: .98;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  opacity: 0.7;
   position: relative;
+  transition: all 0.2s ease;
+  margin: 0 0.25rem;
 }
 .nav-link:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(176,226,152,0.18);
-  background: rgba(255,255,255,0.04);
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.15);
+  background: rgba(139,92,246,0.08);
 }
 .nav-link::after { display: none; } /* underline from horizontal design not needed on vertical nav */
-.nav-link.active { background: rgba(255,255,255,0.06); opacity: 1; }
+.nav-link.active { background: rgba(139,92,246,0.1); opacity: 1; color: var(--dark-accent); }
 
 /* page offset handled in the main .page block below so overrides don't accidentally remove it */
 
@@ -129,15 +137,15 @@ body {
     height: 48px;
     border-radius: 12px;
     border: none;
-    background: linear-gradient(180deg, rgba(var(--primary-dark-rgb),0.98), rgba(var(--primary-dark-rgb),0.9));
-    color: var(--text-light);
+    background: white;
+    color: var(--primary-dark);
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     cursor: pointer;
   }
-  .mobile-nav-toggle:focus { outline: 3px solid rgba(176,226,152,0.18); }
+  .mobile-nav-toggle:focus { outline: 3px solid rgba(139,92,246,0.25); }
 
   /* simple hamburger visuals */
   .mobile-nav-toggle .hamburger {
@@ -169,9 +177,18 @@ body {
   margin: 1.5rem 2rem 3rem calc(var(--nav-width) + var(--page-gutter));
   /* symmetric inner padding so left/right blank space inside the page matches */
   padding: 2rem 2rem 2rem 2rem;
-  background: var(--primary-green);
-  border-radius: 14px;
-  box-shadow: 0 6px 24px rgba(0,0,0,.07);
+  background: var(--container-bg);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+/* Override for home page - full bleed design */
+.page.home-page {
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
 /* Stack child elements vertically with a small gap */
@@ -183,14 +200,12 @@ body {
 
 /* heading glow for Welcome to NEXA (neon) */
 .page h1.nexa-glow {
-  /* neon-style high-contrast green glow */
-  color: var(--text-light);
+  /* neon-style high-contrast glow */
+  color: var(--dark-accent);
   /* intense layered glows for a neon effect */
   text-shadow:
-    0 0 6px rgba(var(--accent-pink-rgb), 1),
-    0 0 12px rgba(var(--accent-pink-rgb), 0.9),
-    0 0 24px rgba(var(--accent-pink-rgb), 0.75),
-    0 6px 30px rgba(var(--accent-pink-rgb), 0.45);
+    0 0 6px rgba(var(--purple-accent-rgb), 0.4),
+    0 0 12px rgba(var(--purple-accent-rgb), 0.2);
   /* faster, more noticeable neon pulse */
   animation: nexa-glow-fade 2.8s ease-in-out infinite;
   will-change: text-shadow, transform;
@@ -236,18 +251,19 @@ body {
 
 /* buttons */
 .btn {
-  background: var(--accent-pink); color: var(--text-light);
+  background: var(--dark-accent); color: var(--text-light);
   border: 0; border-radius: 10px;
   padding: .7rem 1rem; cursor: pointer; font-weight: 600;
+  transition: all 0.2s ease;
 }
-.btn.secondary { background: var(--primary-green); }
+.btn.secondary { background: var(--teal-accent); }
 /* Secondary (suggested prompt) hover/focus and outline */
 .btn.secondary:hover,
 .btn.secondary:focus {
-  /* slightly darker orange on hover for affordance */
+  /* slightly darker shade on hover for affordance */
   filter: brightness(.93);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(67,134,60,0.12), 0 0 0 1px var(--primary-green) inset;
+  box-shadow: 0 0 0 3px rgba(6,182,212,0.12), 0 0 0 1px var(--teal-accent) inset;
 }
 .btn.secondary:active {
   transform: translateY(1px);
@@ -307,9 +323,10 @@ body {
   font-size: 12px;
   color: #222;
 }
-.metric-green { color: rgba(var(--green-shadow-rgb), 1); }
-.metric-blue { color: var(--light-accent); }
-.metric-pink { color: rgba(var(--accent-pink-rgb), 1); }
+.metric-green { color: var(--dark-accent); }
+.metric-blue { color: var(--dark-accent); }
+.metric-pink { color: var(--dark-accent); }
+.metric-purple { color: var(--dark-accent); }
 
 @media (max-width: 640px) {
   .metrics-row { gap: 12px; }
@@ -324,10 +341,10 @@ body {
 .btn.round:hover,
 .btn.round:focus {
   filter: brightness(.93);
-  outline: "var(--dark-accent)" 2px;
+  outline: 2px solid var(--dark-accent);
   transform: translateY(-3px);
-  box-shadow: 0 12px 30px "var(--dark-accent)";
-  color: "var(--light-accent)"
+  box-shadow: 0 12px 30px rgba(168,85,247,0.2);
+  color: var(--text-light);
 }
 .btn.round:active {
   transform: translateY(1px);
@@ -335,7 +352,7 @@ body {
 
 .btn.round:hover,
 .btn.round:focus-visible {
-  background: var(--light-accent);
+  background: var(--dark-accent);
   color: var(--text-light);
 }
 
