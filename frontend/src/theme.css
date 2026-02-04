@@ -1,15 +1,15 @@
 :root{
-  --bg-color: #f9f9f9;
-  --primary-dark: #091E05;
-  --primary-dark-rgb: 9,30,5;
+  --bg-color: #9676A7;
+  --primary-dark: #3b3028;
+  --primary-dark-rgb: 28,15,19;
   --nav-width: 220px;
   --page-gutter: 3rem; /* visible gutter between sidebar and page */
-  --primary-green: #B0E298;
-  --accent-pink: #E072A4;
+  --primary-green: #D897B1;
+  --accent-pink: #D6CBE8;
   --text-light: #f9f9f9;
-  --container-bg: #E072A4;
-  --light-accent: #6883BA;
-  --dark-accent: #3D3B8E;
+  --container-bg: #FE9ABD;
+  --light-accent: #D4FFC2;
+  --dark-accent: #E6B84C;
   --green-shadow: #498F28;
   --green-shadow-rgb: 73,143,40;
   --accent-pink-rgb: 224,114,164;
