@@ -5,7 +5,7 @@ export default function Home() {
     <div className="page">
       <div className="home-hero">
         <div className="hero-left">
-          <h1 className="nexa-glow" style={{ fontSize: "50px", color: "var(--text-light)", marginTop: 0, textAlign: "center" }}>Find the NEXT transfer courses with NEXA</h1>
+          <h1 className="nexa-glow" style={{ fontSize: "50px", color: "var(--text-light)", marginTop: 0, textAlign: "center" }}>NEXA</h1>
           
           <p style={{ marginTop: 8, textAlign: "center" }}>
             Your DVC → UC transfer assistant for <strong style={{ color: "var(--dark-accent)" }}>Computer Science</strong> majors.
