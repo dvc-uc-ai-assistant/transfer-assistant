@@ -8,13 +8,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the backend code
+# Copy the Flask app
 COPY app.py .
-# Copy helper modules from repo root
-COPY log_writer.py .
+# Copy the backend code
 COPY backend ./backend
-COPY agreements_25-26 ./agreements_25-26
-
+# Copy data directory (course agreements and logs)
+COPY data ./data
 # Copy the built frontend code
 COPY frontend/dist ./frontend/dist
 
