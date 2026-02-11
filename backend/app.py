@@ -2,11 +2,15 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
+import sys
 from dotenv import load_dotenv
 import datetime
-import subprocess
-import sys
-import json
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import AI agent directly (no subprocess needed!)
+from backend.ai_agent import get_response
 
 # ---------- ENV & PATHS ----------
 load_dotenv()
@@ -14,7 +18,6 @@ load_dotenv()
 # Go up from backend/ to root directory
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REACT_DIST = os.path.join(ROOT_DIR, "frontend", "dist")  # Vite build output
-AI_AGENT_PATH = os.path.join(ROOT_DIR, "backend", "ai_agent.py")
 
 # ---------- FLASK APP ----------
 # (We keep static config so Flask can serve the built SPA in prod.)
@@ -50,7 +53,7 @@ def health():
 @app.post("/prompt")
 def handle_prompt():
     """
-    Handles AI prompt requests from the frontend by running ai_agent.py
+    Handles AI prompt requests from the frontend using direct import (fast!)
     """
     req_data = request.get_json(silent=True) or {}
     user_prompt = (req_data.get("prompt") or "").strip()
@@ -71,56 +74,11 @@ def handle_prompt():
         
         session_state = sessions[session_id]
         
-        # Build command with session state
-        cmd = [
-            sys.executable,
-            AI_AGENT_PATH,
-            user_prompt,
-            "--session-state",
-            json.dumps(session_state)
-        ]
+        # Call AI agent directly (no subprocess overhead!)
+        formatted_response, updated_state = get_response(user_prompt, session_state)
         
-        # Run ai_agent.py as subprocess with session state
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=60,
-            cwd=ROOT_DIR
-        )
-
-        if result.returncode != 0:
-            error_msg = result.stderr or "Unknown error from ai_agent.py"
-            print(f"ai_agent.py error: {error_msg}")
-            return jsonify({
-                "error": f"AI Agent error: {error_msg}",
-                "session_id": session_id
-            }), 500
-
-        # Parse output: first line is JSON state, rest is response
-        output = result.stdout.strip()
-        stderr = result.stderr.strip()
-        
-        # Debug: log any stderr output
-        if stderr:
-            print(f"[DEBUG] subprocess stderr: {stderr[:200]}")
-        
-        lines = output.split('\n', 1)
-        updated_state = session_state  # Default to current state
-        
-        if len(lines) >= 2:
-            try:
-                updated_state = json.loads(lines[0])
-                sessions[session_id] = updated_state
-                formatted_response = lines[1]
-            except json.JSONDecodeError as e:
-                print(f"[DEBUG] Failed to parse JSON state: {e}")
-                print(f"[DEBUG] First line was: {lines[0][:100]}")
-                # If JSON parsing fails, assume entire output is response
-                formatted_response = output
-        else:
-            # Only one line or empty, use as response
-            formatted_response = output
+        # Update session with new state
+        sessions[session_id] = updated_state
 
         # Return formatted response to chatbot
         return jsonify({
@@ -129,13 +87,18 @@ def handle_prompt():
             "state": updated_state
         }), 200
 
-    except subprocess.TimeoutExpired:
+    except ValueError as e:
+        # Handle missing API key or database errors
+        error_msg = str(e)
+        print(f"ValueError in handle_prompt: {error_msg}")
         return jsonify({
-            "error": "AI Agent timed out. Please try again.",
+            "error": f"Configuration error: {error_msg}",
             "session_id": session_id
         }), 500
     except Exception as e:
         print(f"Error in handle_prompt: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "error": f"An error occurred: {str(e)}",
             "session_id": session_id

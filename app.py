@@ -4,8 +4,9 @@ from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 import datetime
-import subprocess
-import sys
+
+# Import AI agent directly (no subprocess needed!)
+from backend.ai_agent import get_response
 
 # ---------- ENV & PATHS ----------
 load_dotenv()
@@ -13,7 +14,6 @@ load_dotenv()
 # Current directory is root
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 REACT_DIST = os.path.join(ROOT_DIR, "frontend", "dist")  # Vite build output
-AI_AGENT_PATH = os.path.join(ROOT_DIR, "backend", "ai_agent.py")
 
 # ---------- FLASK APP ----------
 # (We keep static config so Flask can serve the built SPA in prod.)
@@ -29,6 +29,9 @@ CORS(app, resources={
 })
 
 print("[OK] Flask app initialized")
+
+# Session storage for maintaining context
+sessions = {}
 
 # ---------- HELPERS ----------
 def new_session_id() -> str:
@@ -46,7 +49,7 @@ def health():
 @app.post("/prompt")
 def handle_prompt():
     """
-    Handles AI prompt requests from the frontend by directly running ai_agent.py
+    Handles AI prompt requests from the frontend using direct import (fast!)
     """
     req_data = request.get_json(silent=True) or {}
     user_prompt = (req_data.get("prompt") or "").strip()
@@ -56,42 +59,42 @@ def handle_prompt():
         return jsonify({"error": "No prompt provided.", "session_id": session_id}), 400
 
     try:
-        # Run ai_agent.py as subprocess with the user prompt
-        result = subprocess.run(
-            [sys.executable, AI_AGENT_PATH, user_prompt],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            cwd=ROOT_DIR
-        )
-
-        if result.returncode != 0:
-            error_msg = result.stderr or "Unknown error from ai_agent.py"
-            print(f"ai_agent.py error: {error_msg}")
-            return jsonify({
-                "error": f"AI Agent error: {error_msg}",
-                "session_id": session_id
-            }), 500
-
-        # Get the output from ai_agent.py
-        output = result.stdout.strip()
+        # Get or create session state
+        if session_id not in sessions:
+            sessions[session_id] = {
+                "campuses": [],
+                "completed_courses": [],
+                "completed_domains": [],
+                "categories": []
+            }
         
-        # The output from ai_agent is the formatted response
-        formatted_response = output if output else "No response from AI Agent"
+        session_state = sessions[session_id]
+        
+        # Call AI agent directly (no subprocess overhead!)
+        formatted_response, updated_state = get_response(user_prompt, session_state)
+        
+        # Update session with new state
+        sessions[session_id] = updated_state
 
         # Return formatted response to chatbot
         return jsonify({
             "response": formatted_response,
-            "session_id": session_id
+            "session_id": session_id,
+            "state": updated_state
         }), 200
 
-    except subprocess.TimeoutExpired:
+    except ValueError as e:
+        # Handle missing API key or database errors
+        error_msg = str(e)
+        print(f"ValueError in handle_prompt: {error_msg}")
         return jsonify({
-            "error": "AI Agent timed out. Please try again.",
+            "error": f"Configuration error: {error_msg}",
             "session_id": session_id
         }), 500
     except Exception as e:
         print(f"Error in handle_prompt: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "error": f"An error occurred: {str(e)}",
             "session_id": session_id
