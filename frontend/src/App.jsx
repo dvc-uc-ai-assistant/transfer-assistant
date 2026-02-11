@@ -13,7 +13,10 @@ export default function App() {
       <div className="app-shell">
         <nav className={"navbar" + (navOpen ? " open" : "") } aria-hidden={!navOpen && window.innerWidth <= 900}>
           <div className="navbar-inner">
-            <h1 className="nav-title">NEXA</h1>
+            <div className="nav-header">
+              <img src="/nexa-logo.png" alt="NEXA" className="nav-logo" />
+              <h1 className="nav-title">NEXA</h1>
+            </div>
             <NavLink to="/" end className={({isActive}) => "nav-link" + (isActive ? " active" : "")} onClick={() => setNavOpen(false)}>Home</NavLink>
             <NavLink to="/how-to" className={({isActive}) => "nav-link" + (isActive ? " active" : "")} onClick={() => setNavOpen(false)}>How&nbsp;to&nbsp;Use</NavLink>
             <NavLink to="/chat" className={({isActive}) => "nav-link" + (isActive ? " active" : "")} onClick={() => setNavOpen(false)}>Chat</NavLink>

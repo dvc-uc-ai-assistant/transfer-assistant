@@ -126,10 +126,15 @@ class PostgresRepository:
                     if focus_only == "science" and not self._is_science_course(dvc):
                         continue
 
+                    # Get UC course info if it exists
+                    uc = equiv.uc_course
                     courses.append({
                         "dvc_code": dvc.course_code,
                         "dvc_title": dvc.title,
                         "dvc_units": dvc.units or 0,
+                        "uc_code": uc.course_code if uc else "",
+                        "uc_title": uc.title if uc else "",
+                        "uc_units": uc.units or 0 if uc else 0,
                         "category": cat.name,
                         "minimum_required": cat.minimum_required or "None",
                     })

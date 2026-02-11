@@ -3,7 +3,7 @@ export default function Contact() {
     <div className="page">
       <h1 style={{ 
         fontSize: "2.2rem", 
-        background: "linear-gradient(90deg, var(--accent-pink), var(--dark-accent))", 
+        background: "linear-gradient(90deg, var(--primary-pink), var(--dark-accent))", 
         WebkitBackgroundClip: "text", 
         WebkitTextFillColor: "transparent", 
         backgroundClip: "text", 
@@ -26,7 +26,7 @@ export default function Contact() {
           borderRadius: "12px",
           padding: "1.75rem",
           boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-          border: "1px solid #e0e0e0",
+          border: "1px solid #f0e6f5",
           transition: "all 0.3s ease",
           cursor: "default"
         }}
@@ -43,7 +43,7 @@ export default function Contact() {
           <p style={{ color: "#666", margin: "0 0 1rem 0", fontSize: "0.95rem" }}>Have questions or feedback?</p>
           <a href="mailto:team@nexa.example" style={{ 
             color: "white", 
-            backgroundColor: "var(--accent-pink)",
+            backgroundColor: "var(--dark-accent)",
             padding: "0.5rem 1rem",
             borderRadius: "6px",
             textDecoration: "none",
@@ -52,8 +52,8 @@ export default function Contact() {
             display: "inline-block",
             transition: "all 0.2s ease"
           }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#d4509f"}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--accent-pink)"}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--purple-accent)"}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--dark-accent)"}
           >
             team@nexa.example
           </a>
@@ -65,7 +65,7 @@ export default function Contact() {
           borderRadius: "12px",
           padding: "1.75rem",
           boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-          border: "1px solid #e0e0e0",
+          border: "1px solid #f0e9f8",
           transition: "all 0.3s ease",
           cursor: "default"
         }}
@@ -82,7 +82,7 @@ export default function Contact() {
           <p style={{ color: "#666", margin: "0 0 1rem 0", fontSize: "0.95rem" }}>Have a suggestion for NEXA?</p>
           <a href="mailto:team@nexa.example?subject=Feature Request" style={{ 
             color: "white", 
-            backgroundColor: "var(--primary-green)",
+            backgroundColor: "var(--teal-accent)",
             padding: "0.5rem 1rem",
             borderRadius: "6px",
             textDecoration: "none",
@@ -91,8 +91,8 @@ export default function Contact() {
             display: "inline-block",
             transition: "all 0.2s ease"
           }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--green-shadow)"}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--primary-green)"}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#0891b2"}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--teal-accent)"}
           >
             Send Request
           </a>
@@ -104,7 +104,7 @@ export default function Contact() {
           borderRadius: "12px",
           padding: "1.75rem",
           boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-          border: "1px solid #e0e0e0",
+          border: "1px solid #f0e6f5",
           transition: "all 0.3s ease",
           cursor: "default"
         }}
@@ -121,7 +121,7 @@ export default function Contact() {
           <p style={{ color: "#666", margin: "0 0 1rem 0", fontSize: "0.95rem" }}>Found something broken?</p>
           <a href="mailto:team@nexa.example?subject=Bug Report" style={{ 
             color: "white", 
-            backgroundColor: "var(--light-accent)",
+            backgroundColor: "var(--dark-accent)",
             padding: "0.5rem 1rem",
             borderRadius: "6px",
             textDecoration: "none",
@@ -130,8 +130,8 @@ export default function Contact() {
             display: "inline-block",
             transition: "all 0.2s ease"
           }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#5a78b5"}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--light-accent)"}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--purple-accent)"}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--dark-accent)"}
           >
             Report Bug
           </a>
@@ -140,16 +140,16 @@ export default function Contact() {
 
       {/* Bottom Message */}
       <div style={{
-        background: "var(--light-accent)",
+        background: "linear-gradient(135deg, var(--teal-accent), var(--dark-accent))",
         borderRadius: "12px",
         padding: "1.5rem",
         textAlign: "center",
-        border: "1px solid rgba(0,0,0,0.05)"
+        border: "1px solid rgba(255,255,255,0.2)"
       }}>
         <p style={{ 
           margin: 0, 
           fontSize: "0.95rem", 
-          color: "var(--text-light)",
+          color: "white",
           lineHeight: "1.6"
         }}>
           We appreciate your feedback and continuously work to improve NEXA. Your input helps us serve students better! 🎓
