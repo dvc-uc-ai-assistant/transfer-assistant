@@ -16,7 +16,23 @@ class PostgresRepository:
 
     def __init__(self, database_url: str):
         """Initialize repository with database connection."""
-        self.engine = create_engine(database_url, echo=False)
+        
+        # Cloud SQL connection pool settings for production
+        connect_args = {}
+        engine_kwargs = {
+            "echo": False,
+            "pool_pre_ping": True,     # Verify connections before using
+            "pool_recycle": 3600,      # Recycle connections after 1 hour
+        }
+        
+        # If using Cloud SQL Unix socket, add special handling
+        if "/cloudsql/" in database_url:
+            engine_kwargs.update({
+                "pool_size": 5,        # Keep 5 connections in pool
+                "max_overflow": 2,     # Allow 2 extra during traffic spikes
+            })
+        
+        self.engine = create_engine(database_url, connect_args=connect_args, **engine_kwargs)
         # Verify tables exist
         Base.metadata.create_all(self.engine)
 

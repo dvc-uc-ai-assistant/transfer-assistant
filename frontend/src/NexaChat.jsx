@@ -44,7 +44,10 @@ export default function NexaChat() {
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef(null);
 
-  const apiBase = "http://127.0.0.1:8081";
+  // Use environment variable or default based on current host
+  // In production (Docker), uses same origin. In dev, uses 8081
+  const apiBase = import.meta.env.VITE_API_BASE_URL || 
+    (window.location.port === "8080" ? "" : "http://127.0.0.1:8081");
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });

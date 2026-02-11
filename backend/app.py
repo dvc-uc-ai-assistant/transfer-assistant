@@ -155,6 +155,10 @@ def catch_all(path):
 
 # ---------- MAIN ----------
 if __name__ == "__main__":
-    # Run on 8081 to match your working setup
-    print("Flask running on http://127.0.0.1:8081")
-    app.run(host="127.0.0.1", port=8081, debug=True)
+    # Use PORT from environment (Cloud Run) or default to 8081 (local dev)
+    port = int(os.getenv("PORT", 8081))
+    host = "0.0.0.0" if os.getenv("FLASK_ENV") == "production" else "127.0.0.1"
+    debug = os.getenv("FLASK_ENV") != "production"
+    
+    print(f"Flask running on http://{host}:{port}")
+    app.run(host=host, port=port, debug=debug)

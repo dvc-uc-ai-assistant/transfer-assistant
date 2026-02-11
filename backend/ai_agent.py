@@ -4,7 +4,7 @@
 
 import os, json, re, csv, argparse, uuid, sys
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -14,6 +14,34 @@ try:
 except ModuleNotFoundError:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from backend.database.repository import PostgresRepository
+
+# ============================================
+# MODULE-LEVEL INITIALIZATION (for API use)
+# ============================================
+# Load environment once when module is imported
+load_dotenv()
+
+# Initialize OpenAI client globally (reused across requests)
+_client: Optional[OpenAI] = None
+_repo: Optional[PostgresRepository] = None
+
+def get_client() -> OpenAI:
+    """Get or create OpenAI client (singleton pattern)."""
+    global _client
+    if _client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY is missing. Put it in your .env file.")
+        _client = OpenAI(api_key=api_key)
+    return _client
+
+def get_repository() -> PostgresRepository:
+    """Get or create database repository (singleton pattern)."""
+    global _repo
+    if _repo is None:
+        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/transfer_assistant")
+        _repo = PostgresRepository(database_url)
+    return _repo
 
 #campus config (3 only)
 CAMPUS_ALIASES = {
