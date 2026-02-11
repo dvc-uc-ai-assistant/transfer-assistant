@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import datetime
 
 # Import AI agent directly (no subprocess needed!)
-from backend.ai_agent import get_response
+from backend.ai_agent import get_response, get_repository
 
 # ---------- ENV & PATHS ----------
 load_dotenv()
@@ -59,6 +59,12 @@ def handle_prompt():
         return jsonify({"error": "No prompt provided.", "session_id": session_id}), 400
 
     try:
+        # Get database repository for chat history
+        repo = get_repository()
+        
+        # Save user message to database
+        repo.save_message(session_id, "user", user_prompt)
+        
         # Get or create session state
         if session_id not in sessions:
             sessions[session_id] = {
@@ -72,6 +78,9 @@ def handle_prompt():
         
         # Call AI agent directly (no subprocess overhead!)
         formatted_response, updated_state = get_response(user_prompt, session_state)
+        
+        # Save assistant response to database
+        repo.save_message(session_id, "assistant", formatted_response)
         
         # Update session with new state
         sessions[session_id] = updated_state
