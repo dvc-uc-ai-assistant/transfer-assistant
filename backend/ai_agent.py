@@ -66,7 +66,10 @@ CATEGORY_ALIASES = {
     "general education": ["general education", "ge", "breadth"],
     "breadth": ["breadth", "ge area", "area"],
     "math": ["math", "mathematics"],
-    "science": ["science", "natural science", "biology", "chemistry", "physics"],
+    "science": ["science", "natural science"],
+    "physics": ["physics", "phys"],
+    "chemistry": ["chemistry", "chem"],
+    "biology": ["biology", "biosc", "bio"],
     "computer science": ["computer science", "cs", "programming", "software"],
     #add more if your JSON uses other labels (e.g., "Engineering Fundamentals", "Major Requirements")
 }
@@ -208,10 +211,11 @@ def llm_parse_user_message(client: OpenAI, user_message: str) -> Dict[str, Any]:
     system = (
         "You are an assistant that parses TRANSFER-ONLY student questions for UC transfer planning from Diablo Valley College (DVC). "
         "Output STRICT JSON (no markdown, no commentary). Keys: intent, parameters, filters.\n"
-        "Allowed intents: find_requirements, find_equivalent_course.\n"
+        "Allowed intents: find_requirements, find_equivalent_course, reverse_lookup.\n"
         "parameters.campus: normalize to UCB, UCD, or UCSD when possible (else null) for backward compatibility.\n"
         "parameters.campuses: ARRAY of campuses (UCB, UCD, UCSD) if multiple are requested (else empty).\n"
-        "parameters.target_course_code: only if user asks about a UC target (e.g., 'CS 61A') for equivalency.\n"
+        "parameters.target_course_code: only if user asks about a UC target (e.g., 'MATH-52 from UC Berkeley' or 'COMPSCI-61A'). "
+        "For reverse lookups: extract the UC course code when user asks 'What are the equivalent DVC courses for MATH-52?'\n"
         "parameters.target_institution: the UC campus name if mentioned (e.g., 'UC Berkeley').\n"
         "filters.focus_only: one of 'cs','math','science','all', or null. "
         "IMPORTANT: If the user asks for a subset like 'science courses for computer science' or 'math requirements for CS', "
@@ -322,34 +326,47 @@ def llm_format_response(client: OpenAI,
                         parsed: Dict[str, Any],
                         completed_courses: Set[str],
                         completed_domains: Set[str],
-                        plain: bool = False) -> str:
+                        plain: bool = False,
+                        skip_next_steps: bool = False) -> str:
     campus_name = PRETTY_CAMPUS.get(campus_key, campus_key)
-    items = []
-    for r in rows:
-        course_code = (r.get("dvc_code") or "").strip()
-        # Skip entries without a course code
-        if not course_code:
-            continue
-        items.append({
-            "course": course_code,
-            "title": (r.get("dvc_title") or "").strip(),
-            "units": r.get("dvc_units", "")
-        })
-
+    items = rows  # Keep full row data for table formatting
+    
     if plain:
         if not items:
-            return f"Transfer prep for {campus_name}:\nNo DVC course mappings found."
-        lines = [f"Transfer prep for {campus_name}:"]
+            return f"No DVC course mappings found for {campus_name}."
+        
+        lines = [f"## Transfer Preparation for {campus_name}\n"]
+        
         if completed_domains or completed_courses:
-            lines.append(f"(excluding completed domains: {', '.join(sorted(completed_domains)) or 'none'}; "
-                         f"completed courses: {', '.join(sorted(completed_courses)) or 'none'})")
-        for it in items:
-            parts = [p for p in [
-                it.get("course"),
-                it.get("title"),
-                (f"{it.get('units')} units" if (it.get("units") not in (None, "")) else None)
-            ] if p]
-            lines.append("• " + " — ".join(parts))
+            excl_text = f"(excluding completed domains: {', '.join(sorted(completed_domains)) or 'none'}; completed courses: {', '.join(sorted(completed_courses)) or 'none'})"
+            lines.append(f"*{excl_text}*\n")
+        
+        lines.append("### Course Equivalencies\n")
+        
+        # Build markdown table
+        lines.append("| DVC Course | DVC Title | UC Course | UC Title | Units |")
+        lines.append("|---|---|---|---|---|")
+        
+        for r in items:
+            dvc_code = (r.get("dvc_code") or "").strip()
+            if not dvc_code:
+                continue
+            
+            dvc_title = (r.get("dvc_title") or "").strip()
+            uc_code = (r.get("uc_code") or "").strip()
+            uc_title = (r.get("uc_title") or "").strip()
+            units = r.get("dvc_units", 0)
+            
+            units_str = f"{units}" if units else "—"
+            lines.append(f"| **{dvc_code}** | {dvc_title} | **{uc_code}** | {uc_title} | {units_str} |")
+        
+        if not skip_next_steps:
+            lines.append("\n### Next Steps\n")
+            lines.append(f"1. Review the courses above for {campus_name}")
+            lines.append("2. Check prerequisites and course schedules")
+            lines.append("3. Plan your semester enrollment based on availability")
+            lines.append("4. Ask about specific courses or transfer requirements")
+        
         return "\n".join(lines)
 
     payload = {
@@ -369,12 +386,10 @@ def llm_format_response(client: OpenAI,
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content":
-                 "Format UC transfer mappings only (no availability/schedule). "
-                 "Output:\n"
-                 "• One summary line: 'Transfer prep for <Campus>:'\n"
-                 "• Optionally: parenthetical note like '(excluding completed domains: science; completed courses: COMSC-110)'\n"
-                 "• Bullets: '• COMSC-200 — Object Oriented Programming C++ (4 units)'\n"
-                 "If empty, say: 'No DVC course mappings found.'"},
+                 "Format UC transfer courses as a conversational guide using markdown. "
+                 "Use heading sizes (##, ###) not bullet points. "
+                 "Structure: Summary → Course list with formatting → Next steps. "
+                 "If empty results, offer helpful suggestions for alternative searches."},
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}
             ],
             temperature=0.2
@@ -387,18 +402,39 @@ def llm_format_response(client: OpenAI,
 
     #deterministic fallback
     if not items:
-        return f"Transfer prep for {campus_name}:\nNo DVC course mappings found."
-    lines = [f"Transfer prep for {campus_name}:"]
+        return f"No DVC course mappings found for {campus_name}. Try adjusting your filters or asking about a different campus."
+    
+    lines = [f"## Transfer Preparation for {campus_name}\n"]
     if completed_domains or completed_courses:
-        lines.append(f"(excluding completed domains: {', '.join(sorted(completed_domains)) or 'none'}; "
-                     f"completed courses: {', '.join(sorted(completed_courses)) or 'none'})")
-    for it in items:
-        parts = [p for p in [
-            it.get("course"),
-            it.get("title"),
-            (f"{it.get('units')} units" if (it.get('units') not in (None, "")) else None)
-        ] if p]
-        lines.append("• " + " — ".join(parts))
+        excl_text = f"(excluding completed domains: {', '.join(sorted(completed_domains)) or 'none'}; completed courses: {', '.join(sorted(completed_courses)) or 'none'})"
+        lines.append(f"*{excl_text}*\n")
+    
+    lines.append("### Course Equivalencies\n")
+    
+    # Build markdown table
+    lines.append("| DVC Course | DVC Title | UC Course | UC Title | Units |")
+    lines.append("|---|---|---|---|---|")
+    
+    for r in items:
+        dvc_code = (r.get("dvc_code") or "").strip()
+        if not dvc_code:
+            continue
+        
+        dvc_title = (r.get("dvc_title") or "").strip()
+        uc_code = (r.get("uc_code") or "").strip()
+        uc_title = (r.get("uc_title") or "").strip()
+        units = r.get("dvc_units", 0)
+        
+        units_str = f"{units}" if units else "—"
+        lines.append(f"| **{dvc_code}** | {dvc_title} | **{uc_code}** | {uc_title} | {units_str} |")
+    
+    if not skip_next_steps:
+        lines.append("\n### Next Steps\n")
+        lines.append(f"1. Review the courses above for {campus_name}")
+        lines.append("2. Check prerequisites and course schedules")
+        lines.append("3. Plan your semester enrollment")
+        lines.append("4. Ask about specific courses or requirements")
+    
     return "\n".join(lines)
 
 #new: multi-campus formatter wrapper
@@ -413,9 +449,21 @@ def llm_format_response_multi(client: OpenAI,
     for ck in campus_keys:
         rows = campus_to_rows.get(ck, [])
         chunks.append(
-            llm_format_response(client, ck, rows, parsed, completed_courses, completed_domains, plain=plain)
+            llm_format_response(client, ck, rows, parsed, completed_courses, completed_domains, plain=plain, skip_next_steps=True)
         )
-    return "\n\n".join(chunks)
+    
+    # Join campus sections and add a single "Next Steps" section at the end
+    response = "\n\n".join(chunks)
+    
+    # Add unified next steps
+    campus_names = ", ".join([PRETTY_CAMPUS.get(ck, ck) for ck in campus_keys])
+    response += "\n\n### Next Steps\n"
+    response += f"1. Review the courses above for {campus_names}\n"
+    response += "2. Check prerequisites and course schedules\n"
+    response += "3. Plan your semester enrollment based on availability\n"
+    response += "4. Ask about specific courses or transfer requirements"
+    
+    return response
 
 #logging
 LOG_CSV = "data/conversation_log.csv"
@@ -721,6 +769,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("prompt", nargs="?", default=None, help="User prompt to process")
+    parser.add_argument("--session-state", type=str, default=None, help="JSON-encoded session state (for API mode)")
     parser.add_argument("--demo", action="store_true", help="Show BEFORE (parser JSON) → AFTER (formatted) and log paths.")
     parser.add_argument("--plain", action="store_true", help="Bypass LLM formatter and use deterministic bullets.")
     parser.add_argument("--json-only", action="store_true", help="Only print parser JSON and exit.")
@@ -757,6 +806,14 @@ def main():
         # When called from Flask as subprocess, use plain formatting for consistency
         use_plain = True
         
+        # Load session state if provided
+        session_state = {}
+        if args.session_state:
+            try:
+                session_state = json.loads(args.session_state)
+            except json.JSONDecodeError:
+                pass
+        
         parsed = llm_parse_user_message(client, user_q)
         if args.json_only:
             print(json.dumps(parsed, indent=2, ensure_ascii=False))
@@ -767,27 +824,30 @@ def main():
 
         #campuses for this session
         available = repo.get_campuses()
-        campus_keys = []
-        if args.campuses:
-            campus_keys = [ck for ck in args.campuses if ck in available]
+        campus_keys = session_state.get("campuses", [])
+        
         if not campus_keys:
+            # First message - detect from query
             campus_keys = parsed.get("parameters", {}).get("campuses") or detect_campuses_from_query(user_q)
+        
         if not campus_keys:
+            # Output state first, then error message
+            print(json.dumps(session_state))
             print("Sorry, I couldn't detect a campus. Try UC Berkeley (UCB), UC Davis (UCD), or UC San Diego (UCSD).")
             return
+        
         campus_keys = [ck for ck in campus_keys if ck in available]
         if not campus_keys:
+            print(json.dumps(session_state))
             print("Could not find data for the requested campus(es).")
             return
 
         #persistent state across the session
-        seed_prefs = parse_preferences_seed(user_q)
-        completed_courses: Set[str] = set(parsed["filters"]["completed_courses"])
-        completed_domains: Set[str] = set(parsed["filters"]["domains_completed"])
+        completed_courses: Set[str] = set(parsed["filters"]["completed_courses"]) | set(session_state.get("completed_courses", []))
+        completed_domains: Set[str] = set(parsed["filters"]["domains_completed"]) | set(session_state.get("completed_domains", []))
         focus_only = parsed["filters"]["focus_only"]
         required_only = parsed["filters"]["required_only"]
-        # Resolve categories in a single place for consistency
-        categories_only: List[str] = resolve_categories_only(parsed["filters"], seed_prefs)
+        categories_only: List[str] = parsed["filters"].get("categories") or session_state.get("categories", [])
 
         # Use repository to get filtered courses
         campus_to_remaining = repo.get_courses(
@@ -809,6 +869,15 @@ def main():
             completed_domains,
             plain=use_plain
         )
+        
+        # Update and output session state first (JSON), then the response
+        updated_state = {
+            "campuses": campus_keys,
+            "completed_courses": sorted(list(completed_courses)),
+            "completed_domains": sorted(list(completed_domains)),
+            "categories": categories_only
+        }
+        print(json.dumps(updated_state))
         print(formatted)
         
         # Log this query

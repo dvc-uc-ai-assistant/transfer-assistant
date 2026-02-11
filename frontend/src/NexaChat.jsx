@@ -1,6 +1,15 @@
 
 import { useEffect, useRef, useState } from "react";
+import MarkdownIt from "markdown-it";
 import "./Chat.css";
+
+// Initialize markdown-it with table support
+const md = new MarkdownIt({
+  html: true,
+  linkify: true,
+  typographer: true,
+  breaks: true
+}).enable(['table']);
 
 // Suggested prompts list
 const suggestedPrompts = [
@@ -35,7 +44,7 @@ export default function NexaChat() {
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef(null);
 
-  const apiBase = import.meta.env.OPENAI_API_KEY || "";
+  const apiBase = "http://127.0.0.1:8081";
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -53,21 +62,26 @@ export default function NexaChat() {
     setLoading(true);
 
     try {
+      console.log(`[DEBUG] Sending prompt to ${apiBase}/prompt:`, text);
       const res = await fetch(`${apiBase}/prompt`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: text }),
       });
 
+      console.log(`[DEBUG] Response status: ${res.status}`);
       if (!res.ok) {
         const t = await res.text().catch(() => "");
+        console.error(`[DEBUG] Error response: ${t}`);
         throw new Error(t || `HTTP ${res.status}`);
       }
       const data = await res.json();
-      const reply = data.response || "Hmm, I didn’t get a response.";
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      console.log(`[DEBUG] Response data:`, data);
+      const reply = data.response || "Hmm, I didn't get a response.";
+      console.log(`[DEBUG] Reply content length: ${reply.length}`);
+      setMessages((prev) => [...prev, { role: "bot", content: reply }]);
     } catch (err) {
-      console.error(err);
+      console.error("[DEBUG] Fetch error:", err);
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: "⚠️ I couldn’t reach the server. Check the base URL in .env and try again." },
@@ -90,20 +104,16 @@ export default function NexaChat() {
 
   return (
     <div className="nexa-chat-card">
-      <div className="nexa-chat-header">
-        <strong>💬 NEXA Chat</strong>
-        <span className="badge" title="Currently supports UC Berkeley, UC Davis, and UC San Diego.">UCB · UCD · UCSD</span>
-        <div className="actions">
-          <button className="btn health-btn" onClick={checkHealth}>Health</button>
-        </div>
-      </div>
-
       <div className="nexa-chat-window">
         {/* Updated rendering logic for messages */}
         {messages.map((m, i) => (
           <div key={i} className={`msg-row ${m.role === 'user' ? 'msg-row-user' : 'msg-row-bot'}`}>
             <div className={`nexa-msg ${m.role === 'user' ? 'user' : 'bot'}`}>
-              {m.content}
+              {m.role === 'bot' ? (
+                <div className="markdown-content" dangerouslySetInnerHTML={{ __html: md.render(m.content) }} />
+              ) : (
+                <div>{m.content}</div>
+              )}
               {m.prompts && (
                 <div className="suggested-prompts-in-message">
                   {m.prompts.map((prompt, j) => (
