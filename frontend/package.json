@@ -10,9 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "markdown-it": "^14.1.0",
+    "markdown-it-table-of-contents": "^1.1.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-router-dom": "^7.9.5"
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "^7.9.5",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

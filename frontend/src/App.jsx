@@ -1,74 +1,41 @@
 import { BrowserRouter, NavLink, Route, Routes } from "react-router-dom";
+import { useState } from "react";
 import Home from "./Home";
 import Chat from "./Chat";
 import Contact from "./Contact";
 import HowTo from "./HowTo";
 
 export default function App() {
+  const [navOpen, setNavOpen] = useState(false);
+
   return (
     <BrowserRouter>
       <div className="app-shell">
-        {/* 🌈 Navbar */}
-        <nav className="navbar">
+        <nav className={"navbar" + (navOpen ? " open" : "") } aria-hidden={!navOpen && window.innerWidth <= 900}>
           <div className="navbar-inner">
-            <h1 className="nav-title" style={{ position: "relative" }}>
-              NEXA
-              <span
-                style={{
-                  position: "absolute",
-                  right: "-12px",
-                  top: "-8px",
-                  fontSize: "0.85rem",
-                  animation: "sparkle 1.8s infinite ease-in-out",
-                }}
-              >
-                ✨
-              </span>
-            </h1>
-
+            <div className="nav-header">
+              <img src="/nexa-logo.png" alt="NEXA" className="nav-logo" />
+              <h1 className="nav-title">NEXA</h1>
+            </div>
+            <NavLink to="/" end className={({isActive}) => "nav-link" + (isActive ? " active" : "")} onClick={() => setNavOpen(false)}>Home</NavLink>
+            <NavLink to="/how-to" className={({isActive}) => "nav-link" + (isActive ? " active" : "")} onClick={() => setNavOpen(false)}>How&nbsp;to&nbsp;Use</NavLink>
+            <NavLink to="/chat" className={({isActive}) => "nav-link" + (isActive ? " active" : "")} onClick={() => setNavOpen(false)}>Chat</NavLink>
+            <NavLink to="/contact" className={({isActive}) => "nav-link" + (isActive ? " active" : "")} onClick={() => setNavOpen(false)}>Contact</NavLink>
             <div className="nav-spacer" />
-
-            <NavLink
-              to="/"
-              end
-              className={({ isActive }) =>
-                "nav-link" + (isActive ? " active" : "")
-              }
-            >
-              Home
-            </NavLink>
-
-            <NavLink
-              to="/how-to"
-              className={({ isActive }) =>
-                "nav-link" + (isActive ? " active" : "")
-              }
-            >
-              How&nbsp;to&nbsp;Use
-            </NavLink>
-
-            <NavLink
-              to="/chat"
-              className={({ isActive }) =>
-                "nav-link" + (isActive ? " active" : "")
-              }
-            >
-              Chat
-            </NavLink>
-
-            <NavLink
-              to="/contact"
-              className={({ isActive }) =>
-                "nav-link" + (isActive ? " active" : "")
-              }
-            >
-              Contact
-            </NavLink>
           </div>
         </nav>
 
-        {/* 🪄 Routes */}
-        <main>
+        {/* Mobile nav toggle button */}
+        <button
+          className="mobile-nav-toggle"
+          aria-label={navOpen ? "Close navigation" : "Open navigation"}
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen((v) => !v)}
+        >
+          <span className="hamburger" aria-hidden="true" />
+        </button>
+
+        <main onClick={() => navOpen && setNavOpen(false)}>
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/how-to" element={<HowTo />} />
@@ -77,37 +44,10 @@ export default function App() {
           </Routes>
         </main>
 
-        {/* 🍰 Footer */}
-        <footer
-          style={{
-            textAlign: "center",
-            padding: "1.2rem",
-            fontWeight: 600,
-            color: "var(--ink-500)",
-            background: "linear-gradient(180deg, #ffffffb8, #fff5fd)",
-            borderTop: "1px solid var(--border)",
-            backdropFilter: "blur(6px)",
-          }}
-        >
-          © {new Date().getFullYear()} NEXA · crafted with ☁️ &amp; 💖
+        <footer style={{ textAlign: "center", padding: "1rem", opacity: .7 }}>
+          © {new Date().getFullYear()} NEXA
         </footer>
       </div>
     </BrowserRouter>
   );
-}
-
-/* Add this little animation either here or in theme.css */
-const sparkleKeyframes = `
-@keyframes sparkle {
-  0%, 100% { opacity: 0; transform: scale(0.8) rotate(0deg); }
-  50% { opacity: 1; transform: scale(1.1) rotate(20deg); }
-}
-`;
-
-// inject sparkle animation dynamically (optional but neat)
-if (typeof document !== "undefined" && !document.getElementById("sparkle-style")) {
-  const style = document.createElement("style");
-  style.id = "sparkle-style";
-  style.innerHTML = sparkleKeyframes;
-  document.head.appendChild(style);
 }

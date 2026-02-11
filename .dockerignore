@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+sklearn-env/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.production.example
+config/.env
+config/.env.*
+
+# Development files
+.git/
+.gitignore
+.vscode/
+.idea/
+*.md
+!README.md
+
+# Local data
+data/logs/
+data/*.csv
+data/*.jsonl
+*.log
+
+# Tests
+tests/
+__pycache__/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.swp
+*.swo
+*~

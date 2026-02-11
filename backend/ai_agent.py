@@ -2,11 +2,46 @@
 # Scope: Transfer-only; Campuses: UCB / UCD / UCSD
 # Adds: Multi-campus selection + Category filtering (to merge Dani's + Eleni's approaches)
 
-import os, json, glob, re, csv, argparse, uuid
+import os, json, re, csv, argparse, uuid, sys
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 from dotenv import load_dotenv
 from openai import OpenAI
+
+# Handle import paths for both running directly and as a module
+try:
+    from backend.database.repository import PostgresRepository
+except ModuleNotFoundError:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from backend.database.repository import PostgresRepository
+
+# ============================================
+# MODULE-LEVEL INITIALIZATION (for API use)
+# ============================================
+# Load environment once when module is imported
+load_dotenv()
+
+# Initialize OpenAI client globally (reused across requests)
+_client: Optional[OpenAI] = None
+_repo: Optional[PostgresRepository] = None
+
+def get_client() -> OpenAI:
+    """Get or create OpenAI client (singleton pattern)."""
+    global _client
+    if _client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY is missing. Put it in your .env file.")
+        _client = OpenAI(api_key=api_key)
+    return _client
+
+def get_repository() -> PostgresRepository:
+    """Get or create database repository (singleton pattern)."""
+    global _repo
+    if _repo is None:
+        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/transfer_assistant")
+        _repo = PostgresRepository(database_url)
+    return _repo
 
 #campus config (3 only)
 CAMPUS_ALIASES = {
@@ -59,7 +94,10 @@ CATEGORY_ALIASES = {
     "general education": ["general education", "ge", "breadth"],
     "breadth": ["breadth", "ge area", "area"],
     "math": ["math", "mathematics"],
-    "science": ["science", "natural science", "biology", "chemistry", "physics"],
+    "science": ["science", "natural science"],
+    "physics": ["physics", "phys"],
+    "chemistry": ["chemistry", "chem"],
+    "biology": ["biology", "biosc", "bio"],
     "computer science": ["computer science", "cs", "programming", "software"],
     #add more if your JSON uses other labels (e.g., "Engineering Fundamentals", "Major Requirements")
 }
@@ -150,7 +188,7 @@ def parse_preferences_seed(q: str) -> dict:
     elif want_science and not (want_cs or want_math):
         exclusive_domain = "science"
 
-    #new: seed categories 
+    #new: seed categories; keep them unless we have an exclusive domain
     seed_categories = normalize_categories_freeform(q)
 
     return {
@@ -159,186 +197,23 @@ def parse_preferences_seed(q: str) -> dict:
         "want_cs": want_cs,
         "want_math": want_math,
         "want_science": want_science,
-        "seed_categories": seed_categories,  
+        # only clear categories when exactly one domain is singled out; keep them for mixed intents like
+        # "science courses for computer science" so science filtering still applies
+        "seed_categories": [] if exclusive_domain else seed_categories,
     }
 
-#load/collect/filter data
-def load_all_data(paths: List[str]) -> Dict[str, Any]:
-    data: Dict[str, Any] = {}
-    for pattern in paths:
-        for path in glob.glob(pattern):
-            base = os.path.basename(path)
-            campus_key = base.split("_")[0].upper()
-            if campus_key not in PRETTY_CAMPUS:
-                continue
-            try:
-                with open(path, "r", encoding="utf-8") as f:
-                    data[campus_key] = json.load(f)
-            except Exception as e:
-                print(f"Error reading {path}: {e}")
-    return data
-
-def collect_course_rows(campus_json: Any) -> List[Dict[str, Any]]:
-    out: List[Dict[str, Any]] = []
-
-    def _rec(o: Any):
-        if isinstance(o, dict):
-            if "Category" in o and "Courses" in o:
-                cat = o.get("Category", "")
-                mr = o.get("Minimum_Required", "")
-                courses = o.get("Courses", [])
-                if isinstance(courses, list):
-                    for pair in courses:
-                        dvc_block = pair.get("DVC")
-                        items = dvc_block if isinstance(dvc_block, list) else [dvc_block]
-                        for d in items:
-                            if isinstance(d, dict):
-                                out.append({
-                                    "category": cat,
-                                    "minimum_required": mr,
-                                    "dvc_code": d.get("Course_Code", "") or d.get("Code", ""),
-                                    "dvc_title": d.get("Title", ""),
-                                    "dvc_units": d.get("Units", "") or d.get("units", ""),
-                                })
-            for v in o.values():
-                _rec(v)
-        elif isinstance(o, list):
-            for i in o:
-                _rec(i)
-
-    _rec(campus_json)
-
-    #dedupe by code
-    seen = set()
-    dedup: List[Dict[str, Any]] = []
-    for r in out:
-        code = (r.get("dvc_code") or "").strip()
-        if code and code not in seen:
-            dedup.append(r)
-            seen.add(code)
-    return dedup
-
-def is_cs_row(row: dict) -> bool:
-    code = (row.get("dvc_code") or "").upper()
-    title = (row.get("dvc_title") or "").lower()
-    cat = (row.get("category") or "").lower()
-    return (
-        code.startswith(("COMSC-", "COMSCI-", "COMPSC-", "CS-"))
-        or "programming" in title
-        or "data structures" in title
-        or "software" in title
-        or "major preparation" in cat
-        or "lower division major" in cat
-        or "computer science" in cat
-    )
-
-def is_math_row(row: dict) -> bool:
-    code = (row.get("dvc_code") or "").upper()
-    cat = (row.get("category") or "").lower()
-    title = (row.get("dvc_title") or "").lower()
-    return (
-        code.startswith(("MATH-", "STAT-"))
-        or "mathematics" in cat
-        or "math" in cat
-        or "calculus" in title
-        or "linear algebra" in title
-        or "differential equations" in title
-    )
-
-def is_science_row(row: dict) -> bool:
-    code = (row.get("dvc_code") or "").upper()
-    cat = (row.get("category") or "").lower()
-    return (
-        code.startswith(("PHYS-", "CHEM-", "BIOSC-", "BIOL-"))
-        or "physics" in cat
-        or "chemistry" in cat
-        or "biology" in cat
-        or "science" in cat
-    )
-
-def _row_matches_any_category(row: dict, categories: List[str]) -> bool:
-    if not categories:
-        return True
-    cat_text = (row.get("category") or "").lower()
-    if not cat_text:
-        return False
-    for requested in categories:
-        rlow = requested.lower()
-        #if the request is a canonical key, check aliases aswell
-        if rlow in CATEGORY_ALIASES:
-            if any(alias in cat_text for alias in CATEGORY_ALIASES[rlow] + [rlow]):
-                return True
-        #otherwise do substring match on provided phrase
-        if rlow in cat_text:
-            return True
-    return False
-
-def filter_rows(rows: List[Dict[str, Any]],
-                seed_prefs: dict,
-                completed_courses: Set[str],
-                completed_domains: Set[str],
-                focus_only: Optional[str],
-                required_only: bool,
-                categories_only: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+#database initialization
+def init_database() -> PostgresRepository:
     """
-    Apply filters in priority:
-    1) Remove completed courses and completed domains
-    2) Apply focus_only (cs|math|science)
-    3) Apply required_only (Minimum_Required is 'all' or positive int)
-    4) Apply categories_only (string-contains on row['category'])
-    5) Otherwise allow mixed
+    Initialize PostgreSQL repository from environment variable.
+    Defaults to localhost if DATABASE_URL not set.
     """
-    filtered: List[Dict[str, Any]] = []
-    completed_upper = {c.upper() for c in completed_courses}
+    database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/transfer_assistant")
+    return PostgresRepository(database_url)
 
-    #seed categories act as hints if categories_only is None
-    if categories_only is None:
-        categories_only = seed_prefs.get("seed_categories") or []
+# collect_course_rows removed - repository handles data retrieval and transformation
 
-    for r in rows:
-        code = (r.get("dvc_code") or "").upper()
-
-        #filter out completed specific courses
-        if code in completed_upper:
-            continue
-
-        #filter out completed domains
-        if "science" in completed_domains and is_science_row(r):
-            continue
-        if "math" in completed_domains and is_math_row(r):
-            continue
-        if "cs" in completed_domains and is_cs_row(r):
-            continue
-
-        #focus filter (LLM-driven)
-        if focus_only == "cs" and not is_cs_row(r):
-            continue
-        if focus_only == "math" and not is_math_row(r):
-            continue
-        if focus_only == "science" and not is_science_row(r):
-            continue
-
-        #required-only filter
-        if required_only:
-            mr = str(r.get("minimum_required", "")).lower()
-            if not (mr == "all" or (mr.isdigit() and int(mr) > 0)):
-                continue
-
-        #seed prefs domain-exclusive
-        exclusive = seed_prefs.get("exclusive_domain")
-        if exclusive == "cs" and not is_cs_row(r):
-            continue
-        if exclusive == "math" and not is_math_row(r):
-            continue
-        if exclusive == "science" and not is_science_row(r):
-            continue
-
-        #new: categories filter (Leni merge)
-        if not _row_matches_any_category(r, categories_only):
-            continue
-
-        filtered.append(r)
-    return filtered
+# filter_rows and related helper functions removed - repository handles filtering
 
 #LLM: single-turn structured parser
 def llm_parse_user_message(client: OpenAI, user_message: str) -> Dict[str, Any]:
@@ -364,12 +239,16 @@ def llm_parse_user_message(client: OpenAI, user_message: str) -> Dict[str, Any]:
     system = (
         "You are an assistant that parses TRANSFER-ONLY student questions for UC transfer planning from Diablo Valley College (DVC). "
         "Output STRICT JSON (no markdown, no commentary). Keys: intent, parameters, filters.\n"
-        "Allowed intents: find_requirements, find_equivalent_course.\n"
+        "Allowed intents: find_requirements, find_equivalent_course, reverse_lookup.\n"
         "parameters.campus: normalize to UCB, UCD, or UCSD when possible (else null) for backward compatibility.\n"
         "parameters.campuses: ARRAY of campuses (UCB, UCD, UCSD) if multiple are requested (else empty).\n"
-        "parameters.target_course_code: only if user asks about a UC target (e.g., 'CS 61A') for equivalency.\n"
+        "parameters.target_course_code: only if user asks about a UC target (e.g., 'MATH-52 from UC Berkeley' or 'COMPSCI-61A'). "
+        "For reverse lookups: extract the UC course code when user asks 'What are the equivalent DVC courses for MATH-52?'\n"
         "parameters.target_institution: the UC campus name if mentioned (e.g., 'UC Berkeley').\n"
-        "filters.focus_only: one of 'cs','math','science','all', or null.\n"
+        "filters.focus_only: one of 'cs','math','science','all', or null. "
+        "IMPORTANT: If the user asks for a subset like 'science courses for computer science' or 'math requirements for CS', "
+        "set focus_only to the SUBSET domain (e.g., 'science' or 'math'), NOT the major context (CS). "
+        "The major context provides background but the actual filter is the course type requested.\n"
         "filters.required_only: boolean.\n"
         "filters.domains_completed: list among 'cs','math','science'.\n"
         "filters.completed_courses: array of normalized DVC course codes (DEPT-NUM) if the user lists them.\n"
@@ -445,10 +324,19 @@ def llm_parse_user_message(client: OpenAI, user_message: str) -> Dict[str, Any]:
         filt["completed_courses"] = sorted(norm)
 
         #new: categories (LLM + local merge)
+        # Merge LLM-provided categories with local parsing
         cats = filt.get("categories") or []
         cats = cats if isinstance(cats, list) else []
         cats_local = normalize_categories_freeform(user_message)
         merged_cats = sorted(set([c for c in cats if isinstance(c, str) and c.strip()] + cats_local))
+
+        # Clear categories if the normalized domain focus is already set
+        focus_norm = filt.get("focus_only")
+        if isinstance(focus_norm, str):
+            focus_norm = focus_norm.lower().strip()
+        if focus_norm in {"cs", "math", "science"}:
+            merged_cats = []
+
         filt["categories"] = merged_cats
 
         return data
@@ -466,30 +354,47 @@ def llm_format_response(client: OpenAI,
                         parsed: Dict[str, Any],
                         completed_courses: Set[str],
                         completed_domains: Set[str],
-                        plain: bool = False) -> str:
+                        plain: bool = False,
+                        skip_next_steps: bool = False) -> str:
     campus_name = PRETTY_CAMPUS.get(campus_key, campus_key)
-    items = []
-    for r in rows:
-        items.append({
-            "course": (r.get("dvc_code") or "").strip(),
-            "title": (r.get("dvc_title") or "").strip(),
-            "units": r.get("dvc_units", "")
-        })
-
+    items = rows  # Keep full row data for table formatting
+    
     if plain:
         if not items:
-            return f"Transfer prep for {campus_name}:\nNo DVC course mappings found."
-        lines = [f"Transfer prep for {campus_name}:"]
+            return f"No DVC course mappings found for {campus_name}."
+        
+        lines = [f"## Transfer Preparation for {campus_name}\n"]
+        
         if completed_domains or completed_courses:
-            lines.append(f"(excluding completed domains: {', '.join(sorted(completed_domains)) or 'none'}; "
-                         f"completed courses: {', '.join(sorted(completed_courses)) or 'none'})")
-        for it in items:
-            parts = [p for p in [
-                it.get("course"),
-                it.get("title"),
-                (f"{it.get('units')} units" if (it.get("units") not in (None, "")) else None)
-            ] if p]
-            lines.append("• " + " — ".join(parts))
+            excl_text = f"(excluding completed domains: {', '.join(sorted(completed_domains)) or 'none'}; completed courses: {', '.join(sorted(completed_courses)) or 'none'})"
+            lines.append(f"*{excl_text}*\n")
+        
+        lines.append("### Course Equivalencies\n")
+        
+        # Build markdown table
+        lines.append("| DVC Course | DVC Title | UC Course | UC Title | Units |")
+        lines.append("|---|---|---|---|---|")
+        
+        for r in items:
+            dvc_code = (r.get("dvc_code") or "").strip()
+            if not dvc_code:
+                continue
+            
+            dvc_title = (r.get("dvc_title") or "").strip()
+            uc_code = (r.get("uc_code") or "").strip()
+            uc_title = (r.get("uc_title") or "").strip()
+            units = r.get("dvc_units", 0)
+            
+            units_str = f"{units}" if units else "—"
+            lines.append(f"| **{dvc_code}** | {dvc_title} | **{uc_code}** | {uc_title} | {units_str} |")
+        
+        if not skip_next_steps:
+            lines.append("\n### Next Steps\n")
+            lines.append(f"1. Review the courses above for {campus_name}")
+            lines.append("2. Check prerequisites and course schedules")
+            lines.append("3. Plan your semester enrollment based on availability")
+            lines.append("4. Ask about specific courses or transfer requirements")
+        
         return "\n".join(lines)
 
     payload = {
@@ -509,12 +414,10 @@ def llm_format_response(client: OpenAI,
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content":
-                 "Format UC transfer mappings only (no availability/schedule). "
-                 "Output:\n"
-                 "• One summary line: 'Transfer prep for <Campus>:'\n"
-                 "• Optionally: parenthetical note like '(excluding completed domains: science; completed courses: COMSC-110)'\n"
-                 "• Bullets: '• COMSC-200 — Object Oriented Programming C++ (4 units)'\n"
-                 "If empty, say: 'No DVC course mappings found.'"},
+                 "Format UC transfer courses as a conversational guide using markdown. "
+                 "Use heading sizes (##, ###) not bullet points. "
+                 "Structure: Summary → Course list with formatting → Next steps. "
+                 "If empty results, offer helpful suggestions for alternative searches."},
                 {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}
             ],
             temperature=0.2
@@ -527,18 +430,39 @@ def llm_format_response(client: OpenAI,
 
     #deterministic fallback
     if not items:
-        return f"Transfer prep for {campus_name}:\nNo DVC course mappings found."
-    lines = [f"Transfer prep for {campus_name}:"]
+        return f"No DVC course mappings found for {campus_name}. Try adjusting your filters or asking about a different campus."
+    
+    lines = [f"## Transfer Preparation for {campus_name}\n"]
     if completed_domains or completed_courses:
-        lines.append(f"(excluding completed domains: {', '.join(sorted(completed_domains)) or 'none'}; "
-                     f"completed courses: {', '.join(sorted(completed_courses)) or 'none'})")
-    for it in items:
-        parts = [p for p in [
-            it.get("course"),
-            it.get("title"),
-            (f"{it.get('units')} units" if (it.get('units') not in (None, "")) else None)
-        ] if p]
-        lines.append("• " + " — ".join(parts))
+        excl_text = f"(excluding completed domains: {', '.join(sorted(completed_domains)) or 'none'}; completed courses: {', '.join(sorted(completed_courses)) or 'none'})"
+        lines.append(f"*{excl_text}*\n")
+    
+    lines.append("### Course Equivalencies\n")
+    
+    # Build markdown table
+    lines.append("| DVC Course | DVC Title | UC Course | UC Title | Units |")
+    lines.append("|---|---|---|---|---|")
+    
+    for r in items:
+        dvc_code = (r.get("dvc_code") or "").strip()
+        if not dvc_code:
+            continue
+        
+        dvc_title = (r.get("dvc_title") or "").strip()
+        uc_code = (r.get("uc_code") or "").strip()
+        uc_title = (r.get("uc_title") or "").strip()
+        units = r.get("dvc_units", 0)
+        
+        units_str = f"{units}" if units else "—"
+        lines.append(f"| **{dvc_code}** | {dvc_title} | **{uc_code}** | {uc_title} | {units_str} |")
+    
+    if not skip_next_steps:
+        lines.append("\n### Next Steps\n")
+        lines.append(f"1. Review the courses above for {campus_name}")
+        lines.append("2. Check prerequisites and course schedules")
+        lines.append("3. Plan your semester enrollment")
+        lines.append("4. Ask about specific courses or requirements")
+    
     return "\n".join(lines)
 
 #new: multi-campus formatter wrapper
@@ -553,9 +477,21 @@ def llm_format_response_multi(client: OpenAI,
     for ck in campus_keys:
         rows = campus_to_rows.get(ck, [])
         chunks.append(
-            llm_format_response(client, ck, rows, parsed, completed_courses, completed_domains, plain=plain)
+            llm_format_response(client, ck, rows, parsed, completed_courses, completed_domains, plain=plain, skip_next_steps=True)
         )
-    return "\n\n".join(chunks)
+    
+    # Join campus sections and add a single "Next Steps" section at the end
+    response = "\n\n".join(chunks)
+    
+    # Add unified next steps
+    campus_names = ", ".join([PRETTY_CAMPUS.get(ck, ck) for ck in campus_keys])
+    response += "\n\n### Next Steps\n"
+    response += f"1. Review the courses above for {campus_names}\n"
+    response += "2. Check prerequisites and course schedules\n"
+    response += "3. Plan your semester enrollment based on availability\n"
+    response += "4. Ask about specific courses or transfer requirements"
+    
+    return response
 
 #logging
 LOG_CSV = "data/conversation_log.csv"
@@ -627,7 +563,30 @@ def parse_cli_campuses(opt_str: Optional[str]) -> List[str]:
             out.append(det)
     return sorted(set(out))
 
-def interactive_session(client: OpenAI, data: Dict[str, Any], args) -> None:
+# helper: clarifying prompt when campus is missing
+def format_campus_clarifier() -> str:
+    campus_opts = ", ".join(f"{name} ({code})" for code, name in PRETTY_CAMPUS.items())
+    return (
+        "I can help with these campuses: "
+        f"{campus_opts}. Which campus should I use? You can reply with a campus name or code (e.g., 'UCD')."
+    )
+
+# helper: resolve categories to apply
+def resolve_categories_only(parsed_filters: Dict[str, Any], seed_prefs: Dict[str, Any]) -> List[str]:
+    """
+    Decide which categories to filter by, prioritizing LLM-extracted categories.
+    If the LLM provided categories, use those. Otherwise, use seed_categories
+    from the user's free-text, but only if a domain focus (cs/math/science)
+    is not already set.
+    """
+    focus_only = parsed_filters.get("focus_only")
+    llm_categories = parsed_filters.get("categories") or []
+    seed_categories = seed_prefs.get("seed_categories") or []
+    if llm_categories:
+        return llm_categories
+    return seed_categories if not focus_only else []
+
+def interactive_session(client: OpenAI, repo: PostgresRepository, args) -> None:
     query_id = 1
     print("\nAsk a transfer question (e.g., 'what do I need for uc berkeley cs', "
           "'uc davis & ucsd cs requirements', or 'major preparation only for berkeley and davis').")
@@ -642,21 +601,23 @@ def interactive_session(client: OpenAI, data: Dict[str, Any], args) -> None:
     parsed = llm_parse_user_message(client, user_q)
     if args.json_only:
         print(json.dumps(parsed, indent=2, ensure_ascii=False))
-        campus_keys_for_log = parsed.get("parameters", {}).get("campuses") or list(data.keys())
-        campus_key_for_log = (campus_keys_for_log[0] if campus_keys_for_log else (next(iter(data.keys())) if data else "UCB"))
+        campus_keys_for_log = parsed.get("parameters", {}).get("campuses") or repo.get_campuses()
+        campus_key_for_log = (campus_keys_for_log[0] if campus_keys_for_log else "UCB")
         append_logs(user_q, parsed, "", campus_key_for_log, [], set(), set(), query_id)
         return
 
     #campuses for this session
     campus_keys = []
     if args.campuses:
-        campus_keys = [ck for ck in args.campuses if ck in data]
+        available = repo.get_campuses()
+        campus_keys = [ck for ck in args.campuses if ck in available]
     if not campus_keys:
         campus_keys = parsed.get("parameters", {}).get("campuses") or detect_campuses_from_query(user_q)
     if not campus_keys:
         print("Sorry, I couldn't detect a campus. Try UC Berkeley (UCB), UC Davis (UCD), or UC San Diego (UCSD).")
         return
-    campus_keys = [ck for ck in campus_keys if ck in data]
+    available = repo.get_campuses()
+    campus_keys = [ck for ck in campus_keys if ck in available]
     if not campus_keys:
         print("Could not find data for the requested campus(es).")
         return
@@ -667,17 +628,19 @@ def interactive_session(client: OpenAI, data: Dict[str, Any], args) -> None:
     completed_domains: Set[str] = set(parsed["filters"]["domains_completed"])
     focus_only = parsed["filters"]["focus_only"]
     required_only = parsed["filters"]["required_only"]
-    categories_only: List[str] = parsed["filters"].get("categories") or seed_prefs.get("seed_categories") or []
-
-    campus_to_all_rows: Dict[str, List[Dict[str, Any]]] = {ck: collect_course_rows(data[ck]) for ck in campus_keys}
+    # Resolve categories in a single place for consistency
+    categories_only: List[str] = resolve_categories_only(parsed["filters"], seed_prefs)
 
     def recompute_remaining() -> Dict[str, List[Dict[str, Any]]]:
-        out: Dict[str, List[Dict[str, Any]]] = {}
-        for ck in campus_keys:
-            rows = campus_to_all_rows.get(ck, [])
-            out[ck] = filter_rows(rows, seed_prefs, completed_courses, completed_domains,
-                                  focus_only, required_only, categories_only=categories_only)
-        return out
+        # Use repository to get filtered courses
+        return repo.get_courses(
+            campus_keys=campus_keys,
+            categories=categories_only if categories_only else None,
+            required_only=required_only,
+            focus_only=focus_only,
+            completed_courses=completed_courses,
+            completed_domains=completed_domains
+        )
 
     campus_to_remaining = recompute_remaining()
 
@@ -809,11 +772,11 @@ def interactive_session(client: OpenAI, data: Dict[str, Any], args) -> None:
 
         #detect/merge campuses 
         new_camps = follow_parsed.get("parameters", {}).get("campuses") or detect_campuses_from_query(follow)
+        available = repo.get_campuses()
         added = False
         for ck in new_camps:
-            if ck in data and ck not in campus_keys:
+            if ck in available and ck not in campus_keys:
                 campus_keys.append(ck)
-                campus_to_all_rows[ck] = collect_course_rows(data[ck])
                 added = True
         if added:
             print("\nIncluded campuses:", ", ".join(PRETTY_CAMPUS[ck] for ck in campus_keys))
@@ -824,6 +787,111 @@ def interactive_session(client: OpenAI, data: Dict[str, Any], args) -> None:
         for ck in campus_keys:
             print_lists(ck, campus_to_remaining[ck], completed_courses, completed_domains)
 
+# ============================================
+# API FUNCTION (for direct import from Flask)
+# ============================================
+def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: Optional[str] = None) -> Tuple[str, Dict]:
+    """
+    Process a user prompt and return formatted response + updated session state.
+    Handles complete RAG pattern: Read from Knowledge → Call AI → Write to History.
+    
+    Args:
+        prompt: User's question/request
+        session_state: Optional dict with keys: campuses, completed_courses, completed_domains, categories
+        session_id: Optional session ID for saving chat history to database
+    
+    Returns:
+        Tuple of (formatted_response: str, updated_session_state: dict)
+    
+    Raises:
+        ValueError: If API key or database connection fails
+    """
+    # Get singleton instances
+    client = get_client()
+    repo = get_repository()
+    
+    # 1. WRITE user message to chat history (if session_id provided)
+    if session_id:
+        repo.save_message(session_id, "user", prompt)
+    
+    # Initialize session state
+    if session_state is None:
+        session_state = {}
+    
+    session_state = {
+        "campuses": session_state.get("campuses", []),
+        "completed_courses": session_state.get("completed_courses", []),
+        "completed_domains": session_state.get("completed_domains", []),
+        "categories": session_state.get("categories", [])
+    }
+    
+    # Parse user message
+    parsed = llm_parse_user_message(client, prompt)
+    
+    # Determine campuses for this session
+    available = repo.get_campuses()
+    campus_keys = session_state.get("campuses", [])
+    
+    if not campus_keys:
+        # First message - detect from query
+        campus_keys = parsed.get("parameters", {}).get("campuses") or detect_campuses_from_query(prompt)
+    
+    if not campus_keys:
+        error_msg = "Sorry, I couldn't detect a campus. Try UC Berkeley (UCB), UC Davis (UCD), or UC San Diego (UCSD)."
+        if session_id:
+            repo.save_message(session_id, "assistant", error_msg)
+        return error_msg, session_state
+    
+    campus_keys = [ck for ck in campus_keys if ck in available]
+    if not campus_keys:
+        error_msg = "Could not find data for the requested campus(es)."
+        if session_id:
+            repo.save_message(session_id, "assistant", error_msg)
+        return error_msg, session_state
+    
+    # Update session state with detected campuses
+    session_state["campuses"] = campus_keys
+    
+    # Persistent state across the session
+    completed_courses: Set[str] = set(parsed["filters"]["completed_courses"]) | set(session_state.get("completed_courses", []))
+    completed_domains: Set[str] = set(parsed["filters"]["domains_completed"]) | set(session_state.get("completed_domains", []))
+    focus_only = parsed["filters"]["focus_only"]
+    required_only = parsed["filters"]["required_only"]
+    categories_only: List[str] = parsed["filters"].get("categories") or session_state.get("categories", [])
+    
+    # 2. READ from Knowledge Base (AssistData via repository)
+    campus_to_remaining = repo.get_courses(
+        campus_keys=campus_keys,
+        categories=categories_only if categories_only else None,
+        required_only=required_only,
+        focus_only=focus_only,
+        completed_courses=completed_courses,
+        completed_domains=completed_domains
+    )
+    
+    # 3. Call AI to format the response
+    formatted = llm_format_response_multi(
+        client,
+        campus_keys,
+        campus_to_remaining,
+        parsed,
+        completed_courses,
+        completed_domains,
+        plain=True  # Use deterministic formatting for API
+    )
+    
+    # Update session state
+    session_state["completed_courses"] = list(completed_courses)
+    session_state["completed_domains"] = list(completed_domains)
+    if categories_only:
+        session_state["categories"] = categories_only
+    
+    # 4. WRITE assistant response to chat history (persisted to Cloud SQL)
+    if session_id:
+        repo.save_message(session_id, "assistant", formatted)
+    
+    return formatted, session_state
+
 #start
 def main():
     load_dotenv()
@@ -833,6 +901,8 @@ def main():
         return
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("prompt", nargs="?", default=None, help="User prompt to process")
+    parser.add_argument("--session-state", type=str, default=None, help="JSON-encoded session state (for API mode)")
     parser.add_argument("--demo", action="store_true", help="Show BEFORE (parser JSON) → AFTER (formatted) and log paths.")
     parser.add_argument("--plain", action="store_true", help="Bypass LLM formatter and use deterministic bullets.")
     parser.add_argument("--json-only", action="store_true", help="Only print parser JSON and exit.")
@@ -841,28 +911,125 @@ def main():
 
     client = OpenAI(api_key=api_key)
 
-    data = load_all_data([
-        os.path.join("data", "uc*.json"),
-        os.path.join("agreements_25-26", "*.json"),
-    ])
-    print("✅ Loaded campuses:", sorted(list(data.keys())))
-    print(f"CSV log → {LOG_CSV}")
-    print(f"JSONL log → {LOG_JSONL}")
-    if not data:
-        print("⚠️ No campus files loaded. Check data/ and agreements_25-26/")
+    # Initialize PostgreSQL repository
+    try:
+        repo = init_database()
+        available_campuses = repo.get_campuses()
+        print("[OK] Connected to PostgreSQL. Available campuses:", sorted(available_campuses), file=sys.stderr)
+    except Exception as e:
+        print(f"[ERROR] Failed to connect to database: {e}", file=sys.stderr)
+        print("Make sure PostgreSQL is running and DATABASE_URL is set correctly.", file=sys.stderr)
         return
+    print(f"CSV log: {LOG_CSV}", file=sys.stderr)
+    print(f"JSONL log: {LOG_JSONL}", file=sys.stderr)
 
     #normalize CLI campuses now
     if args.campuses:
         args.campuses = parse_cli_campuses(args.campuses)
         if args.campuses:
-            print("CLI campuses →", ", ".join(PRETTY_CAMPUS[c] for c in args.campuses))
+            print("CLI campuses:", ", ".join(PRETTY_CAMPUS[c] for c in args.campuses), file=sys.stderr)
         else:
-            print("CLI campuses → none recognized; falling back to parsed input")
+            print("CLI campuses: none recognized; falling back to parsed input", file=sys.stderr)
 
+    # If prompt is provided as argument (from Flask), process it directly
+    if args.prompt:
+        user_q = args.prompt
+        query_id = 1
+        
+        # When called from Flask as subprocess, use plain formatting for consistency
+        use_plain = True
+        
+        # Load session state if provided
+        session_state = {}
+        if args.session_state:
+            try:
+                session_state = json.loads(args.session_state)
+            except json.JSONDecodeError:
+                pass
+        
+        parsed = llm_parse_user_message(client, user_q)
+        if args.json_only:
+            print(json.dumps(parsed, indent=2, ensure_ascii=False))
+            campus_keys_for_log = parsed.get("parameters", {}).get("campuses") or repo.get_campuses()
+            campus_key_for_log = (campus_keys_for_log[0] if campus_keys_for_log else "UCB")
+            append_logs(user_q, parsed, "", campus_key_for_log, [], set(), set(), query_id)
+            return
+
+        #campuses for this session
+        available = repo.get_campuses()
+        campus_keys = session_state.get("campuses", [])
+        
+        if not campus_keys:
+            # First message - detect from query
+            campus_keys = parsed.get("parameters", {}).get("campuses") or detect_campuses_from_query(user_q)
+        
+        if not campus_keys:
+            # Output state first, then error message
+            print(json.dumps(session_state))
+            print("Sorry, I couldn't detect a campus. Try UC Berkeley (UCB), UC Davis (UCD), or UC San Diego (UCSD).")
+            return
+        
+        campus_keys = [ck for ck in campus_keys if ck in available]
+        if not campus_keys:
+            print(json.dumps(session_state))
+            print("Could not find data for the requested campus(es).")
+            return
+
+        #persistent state across the session
+        completed_courses: Set[str] = set(parsed["filters"]["completed_courses"]) | set(session_state.get("completed_courses", []))
+        completed_domains: Set[str] = set(parsed["filters"]["domains_completed"]) | set(session_state.get("completed_domains", []))
+        focus_only = parsed["filters"]["focus_only"]
+        required_only = parsed["filters"]["required_only"]
+        categories_only: List[str] = parsed["filters"].get("categories") or session_state.get("categories", [])
+
+        # Use repository to get filtered courses
+        campus_to_remaining = repo.get_courses(
+            campus_keys=campus_keys,
+            categories=categories_only if categories_only else None,
+            required_only=required_only,
+            focus_only=focus_only,
+            completed_courses=completed_courses,
+            completed_domains=completed_domains
+        )
+
+        # Format and output the response
+        formatted = llm_format_response_multi(
+            client,
+            campus_keys,
+            campus_to_remaining,
+            parsed,
+            completed_courses,
+            completed_domains,
+            plain=use_plain
+        )
+        
+        # Update and output session state first (JSON), then the response
+        updated_state = {
+            "campuses": campus_keys,
+            "completed_courses": sorted(list(completed_courses)),
+            "completed_domains": sorted(list(completed_domains)),
+            "categories": categories_only
+        }
+        print(json.dumps(updated_state))
+        print(formatted)
+        
+        # Log this query
+        append_logs(
+            user_q,
+            parsed,
+            formatted,
+            "MULTI:" + ",".join(campus_keys),
+            [r for ck in campus_keys for r in campus_to_remaining.get(ck, [])],
+            completed_courses,
+            completed_domains,
+            query_id
+        )
+        return
+
+    # Interactive mode if no prompt provided
     while True:
         try:
-            interactive_session(client, data, args)
+            interactive_session(client, repo, args)
         except KeyboardInterrupt:
             print("\nInterrupted by user. Exiting.")
             break

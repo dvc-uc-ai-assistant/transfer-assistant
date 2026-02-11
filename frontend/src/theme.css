@@ -1,83 +1,412 @@
-/* ---------- NEXA Pro Pastel Theme ---------- */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap");
-
 :root{
-  /* ink (readability) */
-  --ink-900:#2b2633; --ink-800:#3a3443; --ink-700:#4b4356; --ink-500:#6b6576; --ink-300:#9b95a6;
-
-  /* subtle pastels */
-  --lav-50:#f8f6ff; --lav-200:#e7e2ff;
-  --mint-50:#f3fbf8; --mint-200:#d7f0e6;
-
-  /* brand */
-  --accent:#7a6dd8;          /* lavender-indigo */
-  --accent-2:#48bfa4;        /* mint-teal */
-  --accent-subtle:#ebe9ff;
-
-  /* surfaces */
-  --bg:#faf9fc; --surface:#fff; --surface-muted:#fcfbfe; --border:#e7e3f1;
-
-  /* shape & shadow */
-  --r-lg:16px; --r-xl:20px; --r-pill:999px;
-  --sh-sm:0 2px 10px rgba(36,31,45,.06);
-  --sh-md:0 8px 24px rgba(36,31,45,.10);
-
-  /* type */
-  --font-ui:"Inter",system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-  --font-display:"Poppins",var(--font-ui);
-  --fs-14:.875rem; --fs-16:1rem; --fs-18:1.125rem; --fs-22:1.375rem;
+  --bg-color: #f8f6fc;
+  --primary-dark: #1a1a1a;
+  --primary-dark-rgb: 26,26,26;
+  --nav-width: 180px;
+  --page-gutter: 2rem; /* visible gutter between sidebar and page */
+  --primary-pink: #d084d4;
+  --accent-pink: #e8a7e8;
+  --text-light: #ffffff;
+  --container-bg: #f5f0fc;
+  --light-accent: #f0e6f5;
+  --dark-accent: #a855d8;
+  --purple-accent: #8b5cf6;
+  --teal-accent: #06b6d4;
+  --purple-accent-rgb: 139,92,246;
+  --accent-pink-rgb: 224,132,212;
 }
 
-html,body,#root{height:100%}
-body{
-  margin:0; background:var(--bg); color:var(--ink-800);
-  font:400 var(--fs-16)/1.6 var(--font-ui);
+/* base */
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg-color);
+  color: var(--primary-dark);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  letter-spacing: -0.01em;
 }
 
-/* shell */
-.app-shell{min-height:100%;display:grid;grid-template-rows:auto 1fr auto}
+/* layout shell */
+.app-shell {
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
 
-/* navbar */
-.navbar{position:sticky;top:0;z-index:20;background:#ffffffcc;backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
-.navbar-inner{display:flex;align-items:center;gap:.6rem;max-width:1100px;margin:0 auto;padding:.9rem 1rem}
-.nav-title{margin:0;font:700 var(--fs-18)/1 var(--font-display);color:var(--ink-900);padding:.35rem .9rem;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--border)}
-.nav-spacer{flex:1}
-.nav-link{ text-decoration:none; font-weight:600; color:var(--ink-700); padding:.5rem .9rem; border-radius:var(--r-pill); border:1px solid transparent; transition:background .2s,color .2s,border-color .2s}
-.nav-link:hover{background:var(--surface);border-color:var(--border)}
-.nav-link.active{background:var(--accent-subtle);border-color:#ddd8ff;color:var(--ink-900)}
+/* left vertical nav */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: var(--nav-width);
+  z-index: 60;
+  background: transparent; /* inner card provides visual styling */
+  padding: 0; /* inner padding handled by .navbar-inner */
+}
+.navbar-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.25rem;
+  /* keep the inner card full height of the sidebar */
+  width: 100%;
+  height: 100%;
+  /* reduce top padding so nav links sit higher in the sidebar */
+  padding: 1.5rem 0.75rem 2rem 0.75rem;
+  background: #f5f0fc;
+  color: var(--primary-dark);
+  border-radius: 0;
+  box-shadow: 1px 0 8px rgba(0,0,0,0.06);
+  border-right: 1px solid #e8d4f1;
+}
+.nav-header { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin: 0 0 1rem 0; }
+.nav-logo { width: 32px; height: 32px; object-fit: contain; flex-shrink: 0; }
+.nav-title { margin: 0; font-size: 0.95rem; font-weight: 700; letter-spacing: 1px; color: var(--dark-accent); text-transform: uppercase; }
+.nav-spacer { flex: 1; }
+.navbar-inner .nav-spacer { display: none; }
+.nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .6rem;
+  width: 100%;
+  color: var(--primary-dark);
+  text-decoration: none;
+  padding: .6rem .8rem;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  opacity: 0.7;
+  position: relative;
+  transition: all 0.2s ease;
+  margin: 0 0.25rem;
+}
+.nav-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.15);
+  background: rgba(139,92,246,0.08);
+}
+.nav-link::after { display: none; } /* underline from horizontal design not needed on vertical nav */
+.nav-link.active { background: rgba(139,92,246,0.1); opacity: 1; color: var(--dark-accent); }
 
-/* pages */
-main{max-width:1100px;margin:1.25rem auto;padding:0 1rem}
-.page{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);box-shadow:var(--sh-sm);padding:1.25rem}
-h1,h2,h3{color:var(--ink-900);margin:0 0 .5rem}
-h1{font:700 var(--fs-22)/1.25 var(--font-display)}
-h2{font:700 1.125rem/1.35 var(--font-display)}
+/* page offset handled in the main .page block below so overrides don't accidentally remove it */
+
+/* responsive: keep vertical sidebar but collapse into a single nav button on small screens */
+@media (max-width: 900px) {
+  /* Hide the large left-offset page margin; let the page use full width */
+  .page { margin: 1.5rem 1rem 3rem; padding: 1rem; }
+
+  /* Start with the sidebar hidden off-canvas on mobile */
+  .navbar {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    height: calc(100vh - 24px);
+    width: var(--nav-width);
+    transform: translateX(-108%);
+    transition: transform 240ms cubic-bezier(.2,.9,.2,1);
+    z-index: 120;
+    pointer-events: none; /* prevent clicks when closed */
+  }
+
+  /* When open, slide the vertical nav into view as an overlay */
+  .navbar.open {
+    transform: translateX(0);
+    pointer-events: auto;
+    box-shadow: 12px 0 40px rgba(0,0,0,0.28);
+    border-radius: 10px;
+  }
+
+  .navbar-inner { /* keep vertical layout inside the overlay */
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem;
+    height: 100%;
+  }
+
+  .nav-link { padding: .8rem 1rem; }
+
+  /* Mobile nav toggle button (single button to open/close nav) */
+  .mobile-nav-toggle {
+    position: fixed;
+    left: 12px;
+    top: 12px;
+    z-index: 130;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    border: none;
+    background: white;
+    color: var(--primary-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    cursor: pointer;
+  }
+  .mobile-nav-toggle:focus { outline: 3px solid rgba(139,92,246,0.25); }
+
+  /* simple hamburger visuals */
+  .mobile-nav-toggle .hamburger {
+    width: 20px; height: 2px; background: white; display: block; position: relative;
+  }
+  .mobile-nav-toggle .hamburger::before,
+  .mobile-nav-toggle .hamburger::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px; background: white;
+  }
+  .mobile-nav-toggle .hamburger::before { top: -6px; }
+  .mobile-nav-toggle .hamburger::after { top: 6px; }
+
+  /* When nav is open, emphasize the toggle (acts as close button) */
+  .navbar.open + .mobile-nav-toggle,
+  .mobile-nav-toggle[aria-expanded="true"] { box-shadow: 0 10px 36px rgba(0,0,0,0.28); }
+
+  /* make sure the main content sits above the nav overlay when closed */
+  main { position: relative; z-index: 10; }
+}
+
+/* page container */
+.page {
+  /* increase the page container width and padding for a roomier layout */
+  max-width: 1300px;
+  /* offset the page on the left to account for the fixed sidebar; use --page-gutter for tunable blank space */
+  margin: 1.5rem 2rem 3rem calc(var(--nav-width) + var(--page-gutter));
+  /* symmetric inner padding so left/right blank space inside the page matches */
+  padding: 2rem 2rem 2rem 2rem;
+  background: var(--container-bg);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+/* Override for home page - full bleed design */
+.page.home-page {
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Stack child elements vertically with a small gap */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* heading glow for Welcome to NEXA (neon) */
+.page h1.nexa-glow {
+  /* neon-style high-contrast glow */
+  color: var(--dark-accent);
+  /* intense layered glows for a neon effect */
+  text-shadow:
+    0 0 6px rgba(var(--purple-accent-rgb), 0.4),
+    0 0 12px rgba(var(--purple-accent-rgb), 0.2);
+  /* faster, more noticeable neon pulse */
+  animation: nexa-glow-fade 2.8s ease-in-out infinite;
+  will-change: text-shadow, transform;
+  transition: text-shadow 160ms ease;
+}
+
+@keyframes nexa-glow-fade {
+  0%, 100% {
+    text-shadow:
+      0 0 4px rgba(var(--accent-pink-rgb), 0.85),
+      0 0 10px rgba(var(--accent-pink-rgb), 0.75),
+      0 0 20px rgba(var(--accent-pink-rgb), 0.55),
+      0 4px 18px rgba(var(--accent-pink-rgb), 0.36);
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    text-shadow:
+      0 0 10px rgba(var(--accent-pink-rgb), 1),
+      0 0 22px rgba(var(--accent-pink-rgb), 0.95),
+      0 0 48px rgba(var(--accent-pink-rgb), 0.8),
+      0 8px 40px rgba(var(--accent-pink-rgb), 0.5);
+    transform: translateY(-1px) scale(1.01);
+  }
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .page h1.nexa-glow { animation: none; }
+}
+
+@media (max-width: 900px) {
+  /* Sidebar collapses; allow content to claim full width */
+  .navbar { position: fixed; height: auto; width: auto; left: 12px; top: 12px; }
+  .navbar-inner { border-right: none; }
+  .nav-link { padding: .6rem 1rem; }
+  .page { margin: 1rem 1rem 3rem 1rem; max-width: none; }
+  /* Ensure chat fills available width when nav is collapsed */
+  .page .nexa-chat-card, .page .chat-card { width: 100%; }
+}
+
+  /* restore spacer when navbar is horizontal */
+  .navbar-inner .nav-spacer { display: block; flex: 1; }
 
 /* buttons */
-.btn{display:inline-flex;align-items:center;gap:.5rem;border:1px solid transparent;cursor:pointer;padding:.65rem 1rem;border-radius:var(--r-pill);font-weight:600;box-shadow:var(--sh-sm);transition:transform .08s,box-shadow .2s,background .2s,border-color .2s;background:var(--accent);color:#fff}
-.btn:hover{transform:translateY(-1px);box-shadow:var(--sh-md)}
-.btn:active{transform:translateY(0)}
-.btn.secondary{background:var(--surface);color:var(--ink-900);border-color:var(--border)}
-.btn.ghost{background:transparent;border-color:var(--border);color:var(--ink-800)}
+.btn {
+  background: var(--dark-accent); color: var(--text-light);
+  border: 0; border-radius: 10px;
+  padding: .7rem 1rem; cursor: pointer; font-weight: 600;
+  transition: all 0.2s ease;
+}
+.btn.secondary { background: var(--teal-accent); }
+/* Secondary (suggested prompt) hover/focus and outline */
+.btn.secondary:hover,
+.btn.secondary:focus {
+  /* slightly darker shade on hover for affordance */
+  filter: brightness(.93);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(6,182,212,0.12), 0 0 0 1px var(--teal-accent) inset;
+}
+.btn.secondary:active {
+  transform: translateY(1px);
+}
 
-/* utility card */
-.kawaii-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:1rem 1.25rem;box-shadow:var(--sh-sm)}
+/* chat UI */
+.chat-card { border-radius: 12px; overflow: hidden; border: 1px solid #d9d7cf; }
+.chat-header { background: var(--primary-dark); color: var(--text-light); padding: .9rem 1rem; }
+.chat-window { height: 60vh; overflow-y: auto; padding: 1rem; background: #f7f7f3; }
+.msg { max-width: 72%; padding: .7rem 1rem; border-radius: 12px; margin: .35rem 0; white-space: pre-wrap; }
+.msg.user { background: var(--primary-green); color: #fff; margin-left: auto; }
+.msg.bot { background: #e9e6dc; color: #222; }
+.input-row { display: grid; grid-template-columns: 1fr auto; gap: .6rem; padding: .9rem; border-top: 1px solid #d9d7cf; background: #fff; }
+.text-input {
+  width: 100%; padding: .75rem .85rem; border-radius: 10px;
+  border: 1px solid #cfcac0; outline: none; background: #fff;
+}
+.text-input:focus { border-color: var(--primary-dark); box-shadow: 0 0 0 3px rgba(40,70,75,.1); }
 
-/* chat */
-.chat-card{border-radius:var(--r-xl);border:1px solid var(--border);background:var(--surface-muted);box-shadow:var(--sh-sm);overflow:hidden}
-.chat-header{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;background:var(--surface);border-bottom:1px solid var(--border);color:var(--ink-900);padding:.9rem 1rem;font-weight:700}
-.chat-window{height:60vh;overflow-y:auto;padding:1rem;background:var(--lav-50)}
-.msg{max-width:72%;padding:.7rem 1rem;border-radius:14px;margin:.4rem 0;white-space:pre-wrap;font-size:var(--fs-16);line-height:1.55;box-shadow:0 1px 6px rgba(0,0,0,.04);color:var(--ink-900)}
-.msg.bot{background:#f2f0ff;border:1px solid #e3defa}
-.msg.user{background:#e9f5ff;border:1px solid #d7e9ff;margin-left:auto}
-.input-row{display:grid;grid-template-columns:1fr auto;gap:.6rem;padding:.9rem;border-top:1px solid var(--border);background:var(--surface)}
-.text-input{width:100%;padding:.75rem .9rem;border-radius:var(--r-pill);border:1px solid #dcd7eb;outline:none;background:#fff;font-size:var(--fs-16)}
-.text-input::placeholder{color:var(--ink-300)}
-.text-input:focus{border-color:#bdb6e6;box-shadow:0 0 0 3px rgba(123,109,216,.18)}
+/* Utility: horizontal button row and round buttons */
+.button-row {
+  display: flex;
+  gap: 12px;
+}
+/* Make buttons in a .button-row split available space evenly */
+.button-row .btn {
+  flex: 1 1 0;
+  /* min-width: 0; /* allow shrinking inside flex */
+  text-align: center;
+  /* keep the row height consistent and make children stretch to fill */
+  align-items: stretch;
+  min-height: 44px; /* ensures a stable row height */
+}
 
-/* accessibility */
-:focus-visible{outline:2px solid #bdb6e6;outline-offset:3px;border-radius:8px}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* Metrics row used on Home Quick Start */
+.metrics-row {
+  display: flex;
+  gap: 12px; /* match button-row gap so columns align */
+  justify-content: space-between; /* distribute equally across the available width */
+  align-items: center;
+  margin-top: 12px;
+}
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 0; /* take equal width like buttons */
+}
+.metric-value {
+  font-weight: 800;
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.metric-label {
+  font-size: 12px;
+  color: #222;
+}
+.metric-green { color: var(--dark-accent); }
+.metric-blue { color: var(--dark-accent); }
+.metric-pink { color: var(--dark-accent); }
+.metric-purple { color: var(--dark-accent); }
 
-/* footer */
-footer{margin:1rem auto 0;max-width:1100px;color:var(--ink-500);border-top:1px solid var(--border);background:#fff}
+@media (max-width: 640px) {
+  .metrics-row { gap: 12px; }
+  .metric-value { font-size: 20px; }
+}
+
+.btn.round {
+  border-radius: 12px;
+  padding: .45rem 1rem;
+  transition: background 150ms ease, color 150ms ease, transform 120ms ease, box-shadow 150ms ease;
+}
+.btn.round:hover,
+.btn.round:focus {
+  filter: brightness(.93);
+  outline: 2px solid var(--dark-accent);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(168,85,247,0.2);
+  color: var(--text-light);
+}
+.btn.round:active {
+  transform: translateY(1px);
+}
+
+.btn.round:hover,
+.btn.round:focus-visible {
+  background: var(--dark-accent);
+  color: var(--text-light);
+}
+
+/* Mobile-friendly chat adjustments */
+@media (max-width: 720px) {
+  /* Make the page and chat area use full width with reduced gutters */
+  .page { margin: 0.75rem 0.75rem 3rem; padding: 1rem; }
+
+  /* Chat card should fill most of viewport but allow header/footer to remain visible */
+  .chat-card {
+    height: calc(100vh - 110px);
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+  }
+
+  /* Chat window stretches and scrolls properly on mobile; enable smooth touch scrolling */
+  .chat-window {
+    flex: 1 1 auto;
+    min-height: 0; /* allow flex children to shrink correctly */
+    padding: 0.75rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Make message bubbles wider and wrap text; increase tap targets */
+  .msg { max-width: 92%; padding: .9rem 1rem; font-size: 1rem; }
+  .msg.user { margin-left: auto; }
+
+  /* Ensure input row is visible and easy to reach; stick to bottom inside the card */
+  .input-row {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .text-input { padding: .85rem; font-size: 1rem; }
+
+  /* Suggested prompts inside messages should be stacked and full width */
+  .suggested-prompts-in-message { display: flex; flex-direction: column; gap: 8px; }
+  .suggested-prompts-in-message .btn { width: 100%; padding: .8rem; font-size: 0.95rem; }
+
+  /* Make the header compact to increase usable chat area */
+  .chat-header { padding: .8rem; gap: 6px; }
+  .chat-header strong { font-size: 1rem; }
+
+  /* Increase default button hit area */
+  .btn { padding: .85rem 1rem; min-height: 44px; }
+}
+
+/* Larger breakpoint tweaks */
+@media (min-width: 721px) and (max-width: 900px) {
+  .chat-card { height: 68vh; }
+  .chat-window { padding: 1rem; }
+}
+

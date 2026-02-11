@@ -2,8 +2,12 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
+import sys
 from dotenv import load_dotenv
 import datetime
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import AI agent directly (no subprocess needed!)
 from backend.ai_agent import get_response
@@ -11,8 +15,8 @@ from backend.ai_agent import get_response
 # ---------- ENV & PATHS ----------
 load_dotenv()
 
-# Current directory is root
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Go up from backend/ to root directory
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REACT_DIST = os.path.join(ROOT_DIR, "frontend", "dist")  # Vite build output
 
 # ---------- FLASK APP ----------
