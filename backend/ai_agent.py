@@ -4,7 +4,7 @@
 
 import os, json, re, csv, argparse, uuid, sys
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -14,6 +14,34 @@ try:
 except ModuleNotFoundError:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from backend.database.repository import PostgresRepository
+
+# ============================================
+# MODULE-LEVEL INITIALIZATION (for API use)
+# ============================================
+# Load environment once when module is imported
+load_dotenv()
+
+# Initialize OpenAI client globally (reused across requests)
+_client: Optional[OpenAI] = None
+_repo: Optional[PostgresRepository] = None
+
+def get_client() -> OpenAI:
+    """Get or create OpenAI client (singleton pattern)."""
+    global _client
+    if _client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY is missing. Put it in your .env file.")
+        _client = OpenAI(api_key=api_key)
+    return _client
+
+def get_repository() -> PostgresRepository:
+    """Get or create database repository (singleton pattern)."""
+    global _repo
+    if _repo is None:
+        database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/transfer_assistant")
+        _repo = PostgresRepository(database_url)
+    return _repo
 
 #campus config (3 only)
 CAMPUS_ALIASES = {
@@ -758,6 +786,111 @@ def interactive_session(client: OpenAI, repo: PostgresRepository, args) -> None:
         print("\nUpdated results:")
         for ck in campus_keys:
             print_lists(ck, campus_to_remaining[ck], completed_courses, completed_domains)
+
+# ============================================
+# API FUNCTION (for direct import from Flask)
+# ============================================
+def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: Optional[str] = None) -> Tuple[str, Dict]:
+    """
+    Process a user prompt and return formatted response + updated session state.
+    Handles complete RAG pattern: Read from Knowledge → Call AI → Write to History.
+    
+    Args:
+        prompt: User's question/request
+        session_state: Optional dict with keys: campuses, completed_courses, completed_domains, categories
+        session_id: Optional session ID for saving chat history to database
+    
+    Returns:
+        Tuple of (formatted_response: str, updated_session_state: dict)
+    
+    Raises:
+        ValueError: If API key or database connection fails
+    """
+    # Get singleton instances
+    client = get_client()
+    repo = get_repository()
+    
+    # 1. WRITE user message to chat history (if session_id provided)
+    if session_id:
+        repo.save_message(session_id, "user", prompt)
+    
+    # Initialize session state
+    if session_state is None:
+        session_state = {}
+    
+    session_state = {
+        "campuses": session_state.get("campuses", []),
+        "completed_courses": session_state.get("completed_courses", []),
+        "completed_domains": session_state.get("completed_domains", []),
+        "categories": session_state.get("categories", [])
+    }
+    
+    # Parse user message
+    parsed = llm_parse_user_message(client, prompt)
+    
+    # Determine campuses for this session
+    available = repo.get_campuses()
+    campus_keys = session_state.get("campuses", [])
+    
+    if not campus_keys:
+        # First message - detect from query
+        campus_keys = parsed.get("parameters", {}).get("campuses") or detect_campuses_from_query(prompt)
+    
+    if not campus_keys:
+        error_msg = "Sorry, I couldn't detect a campus. Try UC Berkeley (UCB), UC Davis (UCD), or UC San Diego (UCSD)."
+        if session_id:
+            repo.save_message(session_id, "assistant", error_msg)
+        return error_msg, session_state
+    
+    campus_keys = [ck for ck in campus_keys if ck in available]
+    if not campus_keys:
+        error_msg = "Could not find data for the requested campus(es)."
+        if session_id:
+            repo.save_message(session_id, "assistant", error_msg)
+        return error_msg, session_state
+    
+    # Update session state with detected campuses
+    session_state["campuses"] = campus_keys
+    
+    # Persistent state across the session
+    completed_courses: Set[str] = set(parsed["filters"]["completed_courses"]) | set(session_state.get("completed_courses", []))
+    completed_domains: Set[str] = set(parsed["filters"]["domains_completed"]) | set(session_state.get("completed_domains", []))
+    focus_only = parsed["filters"]["focus_only"]
+    required_only = parsed["filters"]["required_only"]
+    categories_only: List[str] = parsed["filters"].get("categories") or session_state.get("categories", [])
+    
+    # 2. READ from Knowledge Base (AssistData via repository)
+    campus_to_remaining = repo.get_courses(
+        campus_keys=campus_keys,
+        categories=categories_only if categories_only else None,
+        required_only=required_only,
+        focus_only=focus_only,
+        completed_courses=completed_courses,
+        completed_domains=completed_domains
+    )
+    
+    # 3. Call AI to format the response
+    formatted = llm_format_response_multi(
+        client,
+        campus_keys,
+        campus_to_remaining,
+        parsed,
+        completed_courses,
+        completed_domains,
+        plain=True  # Use deterministic formatting for API
+    )
+    
+    # Update session state
+    session_state["completed_courses"] = list(completed_courses)
+    session_state["completed_domains"] = list(completed_domains)
+    if categories_only:
+        session_state["categories"] = categories_only
+    
+    # 4. WRITE assistant response to chat history (persisted to Cloud SQL)
+    if session_id:
+        repo.save_message(session_id, "assistant", formatted)
+    
+    return formatted, session_state
 
 #start
 def main():
