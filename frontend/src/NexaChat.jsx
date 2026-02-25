@@ -44,10 +44,9 @@ export default function NexaChat() {
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef(null);
 
-  // Use environment variable or default based on current host
-  // In production (Docker), uses same origin. In dev, uses 8081
-  const apiBase = import.meta.env.VITE_API_BASE_URL || 
-    (window.location.port === "8080" ? "" : "http://127.0.0.1:8081");
+  // Use explicit environment override or same-origin by default.
+  // In Vite dev this works with proxy config; in Cloud Run it hits the same service.
+  const apiBase = import.meta.env.VITE_API_BASE_URL || "";
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -98,8 +97,8 @@ export default function NexaChat() {
     try {
       const r = await fetch(`${apiBase}/health`, { method: "GET" });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = await r.json();
-      alert(j.ok ? "✅ Backend reachable." : `⚠️ Backend not ready: ${j.loaded_campuses?.length || 0} campuses loaded`);
+      const text = await r.text();
+      alert(text.trim().toUpperCase() === "OK" ? "✅ Backend reachable." : `⚠️ Health check response: ${text}`);
     } catch {
       alert("❌ Can’t reach backend. Verify OPENAI_API_KEY in .env.");
     }
