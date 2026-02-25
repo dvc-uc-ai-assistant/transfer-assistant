@@ -1,9 +1,31 @@
 # app.py  — NEXA backend (Flask)
+
+from flasgger import Swagger
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 import datetime
+import logging
+import sys
+import json
+
+# ---------- STRUCTURED LOGGING ----------
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_obj = {
+            "severity": record.levelname,
+            "message": record.getMessage(),
+            "timestamp": self.formatTime(record)
+        }
+        return json.dumps(log_obj)
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(JSONFormatter())
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
 
 # Import AI agent directly (no subprocess needed!)
 from backend.ai_agent import get_response
@@ -11,22 +33,37 @@ from backend.ai_agent import get_response
 # ---------- ENV & PATHS ----------
 load_dotenv()
 
-# Current directory is root
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-REACT_DIST = os.path.join(ROOT_DIR, "frontend", "dist")  # Vite build output
+REACT_DIST = os.path.join(ROOT_DIR, "frontend", "dist")
 
 # ---------- FLASK APP ----------
-# (We keep static config so Flask can serve the built SPA in prod.)
 app = Flask(
     __name__,
     static_folder=REACT_DIST,
-    static_url_path="/"      # '/' resolves to index.html
+    static_url_path="/"
 )
 
-# Allow Vite dev server (localhost:5173) to call Flask (localhost:8081)
 CORS(app, resources={
     r"/*": {"origins": ["http://127.0.0.1:5173", "http://localhost:5173"]}
 })
+
+# ---------- SWAGGER (API DOCS) ----------
+swagger_config = {
+    "headers": [],
+    "specs": [
+        {
+            "endpoint": "apispec",
+            "route": "/apispec.json",
+            "rule_filter": lambda rule: True,
+            "model_filter": lambda tag: True,
+        }
+    ],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/apidocs/",
+}
+
+Swagger(app, config=swagger_config)
 
 print("[OK] Flask app initialized")
 
@@ -38,7 +75,6 @@ def new_session_id() -> str:
     return "sess_" + os.urandom(6).hex()
 
 def now_iso() -> str:
-    # millisecond ISO + Z suffix
     return datetime.datetime.utcnow().isoformat(timespec="milliseconds") + "Z"
 
 # ---------- API ROUTES ----------
@@ -46,20 +82,51 @@ def now_iso() -> str:
 def health():
     return "OK", 200
 
+
 @app.post("/prompt")
 def handle_prompt():
     """
-    Handles AI prompt requests from the frontend using direct import (fast!)
+    Get an AI response to a transfer question.
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - prompt
+          properties:
+            prompt:
+              type: string
+              example: "How do I transfer to UC Berkeley for Computer Science?"
+            session_id:
+              type: string
+              example: "abc123"
+    responses:
+      200:
+        description: AI-generated response
+        schema:
+          type: object
+          properties:
+            response:
+              type: string
+            session_id:
+              type: string
     """
     req_data = request.get_json(silent=True) or {}
     user_prompt = (req_data.get("prompt") or "").strip()
     session_id = (req_data.get("session_id") or "").strip() or new_session_id()
 
+    logger.info(f"Received prompt from session {session_id}")
+
     if not user_prompt:
-        return jsonify({"error": "No prompt provided.", "session_id": session_id}), 400
+        return jsonify({
+            "error": "No prompt provided.",
+            "session_id": session_id
+        }), 400
 
     try:
-        # Get or create session state
         if session_id not in sessions:
             sessions[session_id] = {
                 "campuses": [],
@@ -67,16 +134,19 @@ def handle_prompt():
                 "completed_domains": [],
                 "categories": []
             }
-        
+
         session_state = sessions[session_id]
-        
-        # Call AI agent (handles: READ from AssistData → Call AI → WRITE to ChatHistory)
-        formatted_response, updated_state = get_response(user_prompt, session_state, session_id)
-        
-        # Update session with new state
+
+        formatted_response, updated_state = get_response(
+            user_prompt,
+            session_state,
+            session_id
+        )
+
         sessions[session_id] = updated_state
 
-        # Return formatted response to chatbot
+        logger.info(f"Response generated for session {session_id}")
+
         return jsonify({
             "response": formatted_response,
             "session_id": session_id,
@@ -84,26 +154,26 @@ def handle_prompt():
         }), 200
 
     except ValueError as e:
-        # Handle missing API key or database errors
         error_msg = str(e)
-        print(f"ValueError in handle_prompt: {error_msg}")
+        logger.error(f"ValueError in handle_prompt: {error_msg}")
         return jsonify({
             "error": f"Configuration error: {error_msg}",
             "session_id": session_id
         }), 500
+
     except Exception as e:
-        print(f"Error in handle_prompt: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception("Unhandled exception in handle_prompt")
         return jsonify({
             "error": f"An error occurred: {str(e)}",
             "session_id": session_id
         }), 500
 
-# ---------- SPA STATIC (when serving build via Flask) ----------
+
+# ---------- SPA STATIC ----------
 @app.get("/")
 def serve_index():
     return send_from_directory(app.static_folder, "index.html")
+
 
 @app.get("/<path:path>")
 def catch_all(path):
@@ -112,12 +182,12 @@ def catch_all(path):
         return send_from_directory(app.static_folder, path)
     return send_from_directory(app.static_folder, "index.html")
 
+
 # ---------- MAIN ----------
 if __name__ == "__main__":
-    # Use PORT from environment (Cloud Run) or default to 8081 (local dev)
     port = int(os.getenv("PORT", 8081))
     host = "0.0.0.0" if os.getenv("FLASK_ENV") == "production" else "127.0.0.1"
     debug = os.getenv("FLASK_ENV") != "production"
-    
+
     print(f"Flask running on http://{host}:{port}")
     app.run(host=host, port=port, debug=debug)
