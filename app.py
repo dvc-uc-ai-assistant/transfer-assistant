@@ -9,6 +9,9 @@ import datetime
 import logging
 import sys
 import json
+import time
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
 #STRUCTURED LOGGING
 class JSONFormatter(logging.Formatter):
@@ -74,6 +77,15 @@ sessions = {}
 MAX_PROMPT_CHARS = int(os.getenv("MAX_PROMPT_CHARS", "2000"))
 MAX_BODY_BYTES = int(os.getenv("MAX_BODY_BYTES", "20000"))  # about 20KB JSON cap
 
+#GUARDRAILS (RATE LIMIT)
+RATE_LIMIT_WINDOW_SECS = int(os.getenv("RATE_LIMIT_WINDOW_SECS", "60"))
+RATE_LIMIT_MAX_REQ = int(os.getenv("RATE_LIMIT_MAX_REQ", "20"))
+_rate_hits = defaultdict(deque)  # in-memory per instance
+
+#GUARDRAILS (TIMEOUT)
+AI_TIMEOUT_SECS = int(os.getenv("AI_TIMEOUT_SECS", "20"))
+_executor = ThreadPoolExecutor(max_workers=int(os.getenv("AI_MAX_WORKERS", "4")))
+
 #HELPERS
 def new_session_id() -> str:
     return "sess_" + os.urandom(6).hex()
@@ -86,6 +98,38 @@ def guardrail_log(event: str, session_id: str, meta: dict | None = None):
     if meta:
         payload.update(meta)
     logger.warning(json.dumps(payload))
+
+def get_client_ip() -> str:
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+def rate_limit_or_429(session_id: str):
+    key = get_client_ip()
+    now = time.time()
+    q = _rate_hits[key]
+
+    while q and q[0] < now - RATE_LIMIT_WINDOW_SECS:
+        q.popleft()
+
+    if len(q) >= RATE_LIMIT_MAX_REQ:
+        guardrail_log("rate_limited", session_id, {
+            "client_ip": key,
+            "window_secs": RATE_LIMIT_WINDOW_SECS,
+            "max_req": RATE_LIMIT_MAX_REQ
+        })
+        return jsonify({
+            "error": "Rate limit exceeded. Please try again soon.",
+            "session_id": session_id
+        }), 429
+
+    q.append(now)
+    return None
+
+def get_response_with_timeout(user_prompt: str, session_state: dict, session_id: str):
+    future = _executor.submit(get_response, user_prompt, session_state, session_id)
+    return future.result(timeout=AI_TIMEOUT_SECS)
 
 #API ROUTES 
 @app.get("/health")
@@ -189,6 +233,10 @@ def handle_prompt():
             "session_id": session_id
         }), 400
 
+    rl = rate_limit_or_429(session_id)
+    if rl is not None:
+        return rl
+
     try:
         if session_id not in sessions:
             sessions[session_id] = {
@@ -198,13 +246,20 @@ def handle_prompt():
                 "categories": []
             }
 
-        session_state = sessions[session_id]
+                session_state = sessions[session_id]
 
-        formatted_response, updated_state = get_response(
-            user_prompt,
-            session_state,
-            session_id
-        )
+        try:
+            formatted_response, updated_state = get_response_with_timeout(
+                user_prompt,
+                session_state,
+                session_id
+            )
+        except FuturesTimeoutError:
+            guardrail_log("ai_timeout", session_id, {"timeout_secs": AI_TIMEOUT_SECS})
+            return jsonify({
+                "error": "Upstream timeout. Please try again.",
+                "session_id": session_id
+            }), 504
 
         sessions[session_id] = updated_state
 
