@@ -238,7 +238,7 @@ def handle_prompt():
         return rl
 
     try:
-    if session_id not in sessions:
+        if session_id not in sessions:
         sessions[session_id] = {
             "campuses": [],
             "completed_courses": [],
