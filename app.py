@@ -238,17 +238,17 @@ def handle_prompt():
         return rl
 
     try:
-        if session_id not in sessions:
-            sessions[session_id] = {
+    if session_id not in sessions:
+        sessions[session_id] = {
             "campuses": [],
             "completed_courses": [],
             "completed_domains": [],
             "categories": []
         }
-        
-        session_state = sessions[session_id]
-        
-        try:
+
+    session_state = sessions[session_id]
+
+    try:
         formatted_response, updated_state = get_response_with_timeout(
             user_prompt,
             session_state,
@@ -262,6 +262,22 @@ def handle_prompt():
         }), 504
 
     sessions[session_id] = updated_state
+
+    logger.info(json.dumps({
+        "event": "response_generated",
+        "session_id": session_id
+    }))
+
+    return jsonify({
+        "response": formatted_response,
+        "session_id": session_id,
+        "state": updated_state
+    }), 200
+
+except ValueError as e:
+    error_msg = str(e)
+    logger.error(f"ValueError in handle_prompt: {error_msg}")
+    return jsonify({"error": error_msg}), 400
 
         logger.info(json.dumps({
             "event": "response_generated",
