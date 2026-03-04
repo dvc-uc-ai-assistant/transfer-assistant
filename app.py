@@ -238,30 +238,30 @@ def handle_prompt():
         return rl
 
     try:
-        if session_id not in sessions:
-            sessions[session_id] = {
-                "campuses": [],
-                "completed_courses": [],
-                "completed_domains": [],
-                "categories": []
-            }
+    if session_id not in sessions:
+        sessions[session_id] = {
+            "campuses": [],
+            "completed_courses": [],
+            "completed_domains": [],
+            "categories": []
+        }
 
-                session_state = sessions[session_id]
+    session_state = sessions[session_id]
 
-        try:
-            formatted_response, updated_state = get_response_with_timeout(
-                user_prompt,
-                session_state,
-                session_id
-            )
-        except FuturesTimeoutError:
-            guardrail_log("ai_timeout", session_id, {"timeout_secs": AI_TIMEOUT_SECS})
-            return jsonify({
-                "error": "Upstream timeout. Please try again.",
-                "session_id": session_id
-            }), 504
+    try:
+        formatted_response, updated_state = get_response_with_timeout(
+            user_prompt,
+            session_state,
+            session_id
+        )
+    except FuturesTimeoutError:
+        guardrail_log("ai_timeout", session_id, {"timeout_secs": AI_TIMEOUT_SECS})
+        return jsonify({
+            "error": "Upstream timeout. Please try again.",
+            "session_id": session_id
+        }), 504
 
-        sessions[session_id] = updated_state
+    sessions[session_id] = updated_state
 
         logger.info(json.dumps({
             "event": "response_generated",
