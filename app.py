@@ -247,8 +247,8 @@ def handle_prompt():
         }
         
         session_state = sessions[session_id]
-
-    try:
+        
+        try:
         formatted_response, updated_state = get_response_with_timeout(
             user_prompt,
             session_state,
