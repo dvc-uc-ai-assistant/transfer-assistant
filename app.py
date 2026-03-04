@@ -245,8 +245,8 @@ def handle_prompt():
             "completed_domains": [],
             "categories": []
         }
-
-    session_state = sessions[session_id]
+        
+        session_state = sessions[session_id]
 
     try:
         formatted_response, updated_state = get_response_with_timeout(
