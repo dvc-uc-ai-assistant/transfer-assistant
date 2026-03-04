@@ -244,6 +244,10 @@ If your environment can't find `pytest`, ensure it is installed into the active 
 
 If you'd like, I can make any of the above changes (ignore rules, README edits, health/meta endpoints, or offline mode). Tell me which you'd like me to implement and I'll apply the patch and run a quick smoke test.
 
+## Deploy to GCP
+
+For Cloud Run + Cloud SQL deployment steps, see [docs/GCP_DEPLOYMENT.md](docs/GCP_DEPLOYMENT.md).
+
 ---
 
 ## License
