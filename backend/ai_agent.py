@@ -822,7 +822,8 @@ def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: 
         "campuses": session_state.get("campuses", []),
         "completed_courses": session_state.get("completed_courses", []),
         "completed_domains": session_state.get("completed_domains", []),
-        "categories": session_state.get("categories", [])
+        "categories": session_state.get("categories", []),
+        "history": session_state.get("history", []),
     }
     
     # Parse user message
