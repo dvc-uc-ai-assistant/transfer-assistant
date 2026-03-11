@@ -1,9 +1,7 @@
 # backend/humanize_guard.py — NEXA bot/humanizing detection
-#
-# Provides two functions called from app.py:
-#   score_request(session_id, message, timing_ms, honeypot) → (score, flags)
-#   handle_trust_score(score, flags) → "ok" | "slow_down" | "captcha" | "blocked"
-#
+# provides two functions called from app.py:
+# score_request(session_id, message, timing_ms, honeypot) → (score, flags)
+# handle_trust_score(score, flags) → "ok" | "slow_down" | "captcha" | "blocked"
 # Uses an in-memory session store to track per-session behaviour.
 # All thresholds are tunable via the constants below.
 
@@ -16,23 +14,21 @@ from collections import defaultdict
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
 # TUNABLE THRESHOLDS
-# ---------------------------------------------------------------------------
 
-# Minimum time (ms) between input focus and submission — below this = suspiciously fast
+# minimum time (ms) between input focus and submission — below this = suspiciously fast - hella sus
 MIN_HUMAN_TYPING_MS = 1000
 
-# Max messages per session within the velocity window before flagging
+# max messages per session within the velocity window before flagging
 VELOCITY_WINDOW_SECS = 60
 VELOCITY_MAX_MESSAGES = 10
 
-# Trust score thresholds — actions triggered at each level
+# trust score thresholds — actions triggered at each level
 THRESHOLD_SLOW_DOWN = 25   # warn and add friction
 THRESHOLD_CAPTCHA   = 50   # require CAPTCHA challenge
 THRESHOLD_BLOCK     = 100  # hard block (e.g. honeypot filled)
 
-# Penalty weights per flag type
+# penalty weights per flag type
 TRUST_PENALTIES = {
     "honeypot_filled":    100,  # instant block — only bots fill hidden fields
     "instant_submit":      30,  # submitted faster than a human can type
@@ -42,10 +38,8 @@ TRUST_PENALTIES = {
 }
 
 
-# ---------------------------------------------------------------------------
 # IN-MEMORY SESSION STATE
 # (separate from app.py sessions — only stores bot-detection signals)
-# ---------------------------------------------------------------------------
 
 # { session_id: { "last_msg_hash": str, "timestamps": [float], "last_interval": float } }
 _bot_state: dict = defaultdict(lambda: {
@@ -62,9 +56,7 @@ def _guardrail_log(event: str, session_id: str, meta: dict = None):
     logger.warning(json.dumps(payload))
 
 
-# ---------------------------------------------------------------------------
 # CORE SCORING FUNCTION
-# ---------------------------------------------------------------------------
 
 def score_request(
     session_id: str,
@@ -90,9 +82,7 @@ def score_request(
     state = _bot_state[session_id]
     now   = time.time()
 
-    # ------------------------------------------------------------------
     # CHECK 1: Honeypot field — if filled, it's almost certainly a bot
-    # ------------------------------------------------------------------
     if honeypot:
         score += TRUST_PENALTIES["honeypot_filled"]
         flags.append("honeypot_filled")
@@ -100,9 +90,7 @@ def score_request(
         # Return immediately — no point running further checks
         return score, flags
 
-    # ------------------------------------------------------------------
     # CHECK 2: Submission timing — humans take at least ~1 second to type
-    # ------------------------------------------------------------------
     try:
         timing_ms = float(timing_ms)
     except (TypeError, ValueError):
@@ -113,9 +101,7 @@ def score_request(
         flags.append("instant_submit")
         _guardrail_log("bot_instant_submit", session_id, {"timing_ms": timing_ms})
 
-    # ------------------------------------------------------------------
     # CHECK 3: Duplicate message — same content sent again this session
-    # ------------------------------------------------------------------
     msg_hash = hashlib.md5(message.strip().lower().encode()).hexdigest()
     if state["last_msg_hash"] and msg_hash == state["last_msg_hash"]:
         score += TRUST_PENALTIES["duplicate_message"]
@@ -123,10 +109,8 @@ def score_request(
         _guardrail_log("bot_duplicate_message", session_id, {})
     state["last_msg_hash"] = msg_hash
 
-    # ------------------------------------------------------------------
     # CHECK 4: Velocity — too many messages in the rolling time window
-    # ------------------------------------------------------------------
-    # Prune timestamps outside the window
+    # prune timestamps outside the window
     state["timestamps"] = [
         t for t in state["timestamps"]
         if now - t < VELOCITY_WINDOW_SECS
@@ -142,9 +126,7 @@ def score_request(
 
     state["timestamps"].append(now)
 
-    # ------------------------------------------------------------------
     # CHECK 5: Uniform interval — messages arriving at suspiciously even spacing
-    # ------------------------------------------------------------------
     if len(state["timestamps"]) >= 3:
         intervals = [
             state["timestamps"][i] - state["timestamps"][i - 1]
@@ -159,9 +141,7 @@ def score_request(
     return score, flags
 
 
-# ---------------------------------------------------------------------------
 # ACTION DECISION
-# ---------------------------------------------------------------------------
 
 def handle_trust_score(score: int, flags: list[str]) -> str:
     """
