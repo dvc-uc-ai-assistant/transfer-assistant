@@ -106,7 +106,7 @@ recent_sessions = repo.get_recent_sessions(days=7)
 
 ## 🔄 Integration with Flask App
 
-Both [app.py](../app.py) and [backend/app.py](../backend/app.py) now automatically save chat messages to the database:
+Both [app.py](../app.py) and [backend/entrypoint_wrapper.py](../backend/entrypoint_wrapper.py) now automatically save chat messages to the database:
 
 ```python
 from backend.ai_agent import get_response, get_repository
@@ -153,7 +153,7 @@ The tables are now integrated! Just run your Flask app:
 
 ```powershell
 # Development
-python backend/app.py
+python backend/entrypoint_wrapper.py
 
 # Production (Docker)
 docker build -t my-app .

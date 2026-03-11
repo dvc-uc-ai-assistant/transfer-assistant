@@ -6,7 +6,12 @@ export default defineConfig({
   server: {
     proxy: {
       "/prompt": {
-        target: "http://127.0.0.1:8080",
+        target: "http://127.0.0.1:8081",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/health": {
+        target: "http://127.0.0.1:8081",
         changeOrigin: true,
         secure: false,
       },

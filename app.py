@@ -1,6 +1,4 @@
 # app.py  — NEXA backend (Flask)
-
-from flasgger import Swagger
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
@@ -31,8 +29,7 @@ class JSONFormatter(logging.Formatter):
 
 
 
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(JSONFormatter())
+from backend.ai_agent import get_response
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -44,8 +41,9 @@ from backend.ai_agent import get_response  # noqa: E402
 # ENV & PATHS
 load_dotenv()
 
+# Current directory is root
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-REACT_DIST = os.path.join(ROOT_DIR, "frontend", "dist")
+REACT_DIST = os.path.join(ROOT_DIR, "frontend", "dist")  # Vite build output
 
 # FLASK APP
 app = Flask(
@@ -54,13 +52,9 @@ app = Flask(
     static_url_path="/",
 )
 
+# Allow Vite dev server (localhost:5173) to call Flask (localhost:8081)
 CORS(app, resources={
-    r"/*": {"origins": [
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-        "http://127.0.0.1:8081",
-        "http://localhost:8081",
-    ]}
+    r"/*": {"origins": ["http://127.0.0.1:5173", "http://localhost:5173"]}
 })
 
 # SWAGGER (API DOCS) demo for viewing checks and whatnot
@@ -103,9 +97,8 @@ _executor = ThreadPoolExecutor(max_workers=int(os.getenv("AI_MAX_WORKERS", "4"))
 def new_session_id() -> str:
     return "sess_" + os.urandom(6).hex()
 
-
-
 def now_iso() -> str:
+    # millisecond ISO + Z suffix
     return datetime.datetime.utcnow().isoformat(timespec="milliseconds") + "Z"
 
 
@@ -168,38 +161,14 @@ def get_response_with_timeout(user_prompt: str, session_state: dict, session_id:
 def health():
     return "OK", 200
 
-
 @app.post("/prompt")
 def handle_prompt():
     """
-    Get an AI response to a transfer question.
-    ---
-    parameters:
-      - name: body
-        in: body
-        required: true
-        schema:
-          type: object
-          required:
-            - prompt
-          properties:
-            prompt:
-              type: string
-              example: "How do I transfer to UC Berkeley for Computer Science?"
-            session_id:
-              type: string
-              example: "abc123"
-    responses:
-      200:
-        description: AI-generated response
-        schema:
-          type: object
-          properties:
-            response:
-              type: string
-            session_id:
-              type: string
+    Handles AI prompt requests from the frontend using direct import.
     """
+    req_data = request.get_json(silent=True) or {}
+    user_prompt = (req_data.get("prompt") or "").strip()
+    session_id = (req_data.get("session_id") or "").strip() or new_session_id()
 
     # size cap (cost/resource protection) 
     if request.content_length is not None and request.content_length > MAX_BODY_BYTES:
@@ -353,24 +322,14 @@ def handle_prompt():
     
 
     try:
-        # AI call w/ timeout
-        try:
-            formatted_response, updated_state = get_response_with_timeout(
-                user_prompt,
-                session_state,
-                session_id,
-            )
-        except FuturesTimeoutError:
-            guardrail_log("ai_timeout", session_id, {"timeout_secs": AI_TIMEOUT_SECS})
-            return (
-                jsonify(
-                    {
-                        "error": "Upstream timeout. Please try again.",
-                        "session_id": session_id,
-                    }
-                ),
-                504,
-            )
+        # Get or create session state
+        if session_id not in sessions:
+            sessions[session_id] = {
+                "campuses": [],
+                "completed_courses": [],
+                "completed_domains": [],
+                "categories": []
+            }
 
         # persist updated state
         sessions[session_id] = updated_state
@@ -463,7 +422,6 @@ def download_chat():
 @app.get("/")
 def serve_index():
     return send_from_directory(app.static_folder, "index.html")
-
 
 @app.get("/<path:path>")
 def catch_all(path):
