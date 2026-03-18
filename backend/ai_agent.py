@@ -159,6 +159,27 @@ def normalize_categories_freeform(text: str) -> List[str]:
         out.add(matched_key or p)
     return sorted(out)
 
+
+def user_explicitly_requests_categories(text: str) -> bool:
+    """Return True only when the user clearly asks for category-based filtering."""
+    low = normalize_typos(text)
+    explicit_phrases = [
+        "category",
+        "categories",
+        "general education",
+        "breadth",
+        "major preparation",
+        "lower division major",
+        "science only",
+        "math only",
+        "cs only",
+        "computer science only",
+    ]
+    if any(p in low for p in explicit_phrases):
+        return True
+
+    return bool(re.search(r"\b(show|list|only)\b.*\b(category|categories)\b", low))
+
 #local helpers 
 def _normalize_single_code(raw: str) -> str:
     s = raw.upper().strip().replace(" ", "-")
@@ -921,7 +942,11 @@ def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: 
     completed_domains: Set[str] = set(parsed["filters"]["domains_completed"]) | set(session_state.get("completed_domains", []))
     focus_only = parsed["filters"]["focus_only"]
     required_only = parsed["filters"]["required_only"]
-    categories_only: List[str] = parsed["filters"].get("categories") or session_state.get("categories", [])
+    parsed_categories = parsed["filters"].get("categories") or []
+    if user_explicitly_requests_categories(prompt):
+        categories_only: List[str] = parsed_categories or session_state.get("categories", [])
+    else:
+        categories_only = session_state.get("categories", [])
     
     # 2. READ from Knowledge Base (AssistData via repository)
     campus_to_remaining = repo.get_courses(

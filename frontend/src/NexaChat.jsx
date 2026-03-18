@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import MarkdownIt from "markdown-it";
 import "./Chat.css";
 
+const CHAT_STORAGE_KEY = "nexa_chat_state_v1";
+
 // initialize markdown-it with table support
 const md = new MarkdownIt({
   html: true,
@@ -43,10 +45,37 @@ export default function NexaChat() {
     return `sess_client_${timePart}_${randomPart}`;
   };
 
-  const [messages, setMessages] = useState([initialAssistantMessage]);
-  const [input, setInput] = useState("");
+  const loadPersistedChatState = () => {
+    try {
+      const raw = sessionStorage.getItem(CHAT_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  };
+
+  const persistedStateRef = useRef(undefined);
+  if (persistedStateRef.current === undefined) {
+    persistedStateRef.current = loadPersistedChatState();
+  }
+  const persistedState = persistedStateRef.current;
+
+  const [messages, setMessages] = useState(() => {
+    const persistedMessages = persistedState?.messages;
+    return Array.isArray(persistedMessages) && persistedMessages.length
+      ? persistedMessages
+      : [initialAssistantMessage];
+  });
+  const [input, setInput] = useState(() =>
+    typeof persistedState?.input === "string" ? persistedState.input : ""
+  );
   const [loading, setLoading] = useState(false);
-  const [isNewChat, setIsNewChat] = useState(true);
+  const [isNewChat, setIsNewChat] = useState(() =>
+    typeof persistedState?.isNewChat === "boolean" ? persistedState.isNewChat : true
+  );
   const chatEndRef = useRef(null);
 
   // Use explicit environment override or same-origin by default.
@@ -54,15 +83,21 @@ export default function NexaChat() {
   const apiBase = import.meta.env.VITE_API_BASE_URL || "";
 
   // NEW ADDITION: Stores session_id returned by backend so PDF download knows which session to export 
-  const [sessionId, setSessionId] = useState(() => createClientSessionId());
+  const [sessionId, setSessionId] = useState(() => {
+    const persistedSessionId = persistedState?.sessionId;
+    return typeof persistedSessionId === "string" && persistedSessionId
+      ? persistedSessionId
+      : createClientSessionId();
+  });
   const sessionIdRef = useRef(sessionId);
 
   // NEW ADDITION: Tracks the time user focused the input box, used to calculate typing time for bot detection 
   const focusTimeRef = useRef(null);
 
   // NEW ADDITION: Tracks whether a CAPTCHA challenge is required before user can send again 
-  const [captchaRequired, setCaptchaRequired] = useState(false);
-  const tabWasHiddenRef = useRef(false);
+  const [captchaRequired, setCaptchaRequired] = useState(() =>
+    typeof persistedState?.captchaRequired === "boolean" ? persistedState.captchaRequired : false
+  );
   
 
   useEffect(() => {
@@ -74,28 +109,21 @@ export default function NexaChat() {
   }, [sessionId]);
 
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        tabWasHiddenRef.current = true;
-        return;
-      }
-
-      if (!tabWasHiddenRef.current) {
-        return;
-      }
-
-      tabWasHiddenRef.current = false;
-      const freshSession = createClientSessionId();
-      setSessionId(freshSession);
-      sessionIdRef.current = freshSession;
-      setMessages([initialAssistantMessage]);
-      setInput("");
-      setCaptchaRequired(false);
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, []);
+    try {
+      sessionStorage.setItem(
+        CHAT_STORAGE_KEY,
+        JSON.stringify({
+          messages,
+          input,
+          isNewChat,
+          sessionId,
+          captchaRequired,
+        })
+      );
+    } catch {
+      // Ignore sessionStorage write errors (private mode/quota).
+    }
+  }, [messages, input, isNewChat, sessionId, captchaRequired]);
 
   async function sendMessage(promptText) {
     const text = (typeof promptText === 'string' ? promptText : input).trim();
