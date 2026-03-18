@@ -3,10 +3,11 @@ PostgreSQL Repository for Transfer Assistant.
 Queries the database for course data, equivalencies, and transfer mappings.
 """
 
+from datetime import datetime
 from typing import List, Dict, Set, Optional
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from backend.database.models import AssistData, ChatHistory, Base
+from backend.database.models import AssistData, ChatHistory, TransferRule, Base
 
 
 class PostgresRepository:
@@ -14,6 +15,10 @@ class PostgresRepository:
 
     def __init__(self, database_url: str):
         """Initialize repository with database connection."""
+        if not database_url or not isinstance(database_url, str):
+            raise ValueError(
+                "DATABASE_URL is missing. Set it in your environment or load it from .env before creating PostgresRepository."
+            )
         
         # Cloud SQL connection pool settings for production
         connect_args = {}
@@ -43,131 +48,60 @@ class PostgresRepository:
         completed_courses: Optional[Set[str]] = None,
         completed_domains: Optional[Set[str]] = None,
     ) -> Dict[str, List[Dict]]:
-        """
-        Retrieve course equivalencies from JSON data, filtered by campus, category, and criteria.
-        
-        Returns:
-            {
-                "UCB": [
-                    {
-                        "dvc_code": "MATH-192",
-                        "dvc_title": "Analytic Geometry and Calculus I",
-                        "dvc_units": 5,
-                        "uc_code": "MATH-51",
-                        "uc_title": "Calculus 1",
-                        "uc_units": 4,
-                        "category": "Mathematics Requirements",
-                        "minimum_required": "3",
-                    },
-                    ...
-                ],
-                "UCD": [...],
-                ...
-            }
-        """
+        """Retrieve SQL transfer rule rows, filtered by campus and user criteria."""
         completed_courses = completed_courses or set()
         completed_domains = completed_domains or set()
-        
-        result = {}
+        completed_courses_upper = {c.upper() for c in completed_courses}
+        categories_lower = {c.strip().lower() for c in (categories or []) if c and c.strip()}
+        focus_only = (focus_only or "").strip().lower() or None
+
+        result: Dict[str, List[Dict]] = {}
 
         with Session(self.engine) as session:
             for campus_key in campus_keys:
-                courses = []
-                
-                # Get assist_data for this campus
-                records = session.query(AssistData).filter_by(
-                    source_college="DVC",
-                    target_college=campus_key
-                ).all()
-                
-                if not records:
-                    result[campus_key] = []
-                    continue
-                
-                # Use the most recent record
-                record = max(records, key=lambda r: r.updated_at)
-                json_data = record.agreements_json
-                
-                # Parse the JSON structure
-                category_list = json_data.get("categories", [])
-                
-                for item in category_list:
-                    if not isinstance(item, dict):
+                rules = (
+                    session.query(TransferRule)
+                    .filter_by(source_college="DVC", target_college=campus_key)
+                    .order_by(TransferRule.category_name.asc(), TransferRule.dvc_course_code.asc())
+                    .all()
+                )
+
+                courses: List[Dict] = []
+                for rule in rules:
+                    dvc_code = (rule.dvc_course_code or "").strip()
+                    dvc_title = rule.dvc_course_title or ""
+                    category_name = rule.category_name or ""
+                    if not dvc_code:
                         continue
-                    
-                    # Skip the Year entry
-                    if "Year" in item:
+
+                    if categories_lower and category_name.strip().lower() not in categories_lower:
                         continue
-                    
-                    # This is a category
-                    category_name = item.get("Category", "")
-                    minimum_required = item.get("Minimum_Required", 0)
-                    course_list = item.get("Courses", [])
-                    
-                    # Filter by category name
-                    if categories and category_name not in categories:
+
+                    if required_only and not rule.is_required:
                         continue
-                    
-                    # Filter by required_only
-                    if required_only and minimum_required == 0:
+
+                    if dvc_code.upper() in completed_courses_upper:
                         continue
-                    
-                    # Process each course in this category
-                    for course_item in course_list:
-                        if not isinstance(course_item, dict):
-                            continue
-                        
-                        uc_info = course_item.get("UC_Berkeley", course_item.get("UC_Davis", course_item.get("UC_San_Diego", {})))
-                        dvc_info = course_item.get("DVC", {})
-                        
-                        # Handle DVC as array (multiple equivalencies)
-                        if isinstance(dvc_info, list):
-                            dvc_courses = dvc_info
-                        else:
-                            dvc_courses = [dvc_info]
-                        
-                        for dvc in dvc_courses:
-                            if not isinstance(dvc, dict):
-                                continue
-                            
-                            dvc_code = dvc.get("Course_Code", "")
-                            dvc_title = dvc.get("Title", "")
-                            dvc_units = dvc.get("Units", 0)
-                            
-                            if not dvc_code:
-                                continue
-                            
-                            # Filter by completed courses
-                            if dvc_code.upper() in {c.upper() for c in completed_courses}:
-                                continue
-                            
-                            # Filter by completed domains
-                            if self._is_cs_course(dvc_code, dvc_title) and "cs" in completed_domains:
-                                continue
-                            if self._is_math_course(dvc_code, dvc_title) and "math" in completed_domains:
-                                continue
-                            if self._is_science_course(dvc_code, dvc_title) and "science" in completed_domains:
-                                continue
-                            
-                            # Filter by focus_only
-                            if focus_only == "cs" and not self._is_cs_course(dvc_code, dvc_title):
-                                continue
-                            if focus_only == "math" and not self._is_math_course(dvc_code, dvc_title):
-                                continue
-                            if focus_only == "science" and not self._is_science_course(dvc_code, dvc_title):
-                                continue
-                            
-                            courses.append({
-                                "dvc_code": dvc_code,
-                                "dvc_title": dvc_title,
-                                "dvc_units": dvc_units,
-                                "uc_code": uc_info.get("Course_Code", ""),
-                                "uc_title": uc_info.get("Title", ""),
-                                "uc_units": uc_info.get("Units", 0),
-                                "category": category_name,
-                                "minimum_required": str(minimum_required),
-                            })
-                
+
+                    domain = self._course_domain(dvc_code, dvc_title, rule.domain)
+
+                    if domain in completed_domains:
+                        continue
+
+                    if focus_only in {"cs", "math", "science"} and domain != focus_only:
+                        continue
+
+                    courses.append({
+                        "dvc_code": dvc_code,
+                        "dvc_title": dvc_title,
+                        "dvc_units": float(rule.dvc_units) if rule.dvc_units is not None else 0,
+                        "uc_code": rule.uc_course_code or "",
+                        "uc_title": rule.uc_course_title or "",
+                        "uc_units": float(rule.uc_units) if rule.uc_units is not None else 0,
+                        "category": category_name,
+                        "minimum_required": str(rule.minimum_required or 0),
+                    })
+
                 result[campus_key] = courses
 
         return result
@@ -175,28 +109,31 @@ class PostgresRepository:
     def get_campuses(self) -> List[str]:
         """Get list of available campus codes."""
         with Session(self.engine) as session:
-            records = session.query(AssistData.target_college).distinct().all()
-            return [r[0] for r in records]
+            records = session.query(TransferRule.target_college).distinct().all()
+            return sorted([r[0] for r in records if r[0]])
 
     def get_categories(self, campus_key: str, year: str = "2025-2026") -> List[str]:
         """Get list of categories for a specific campus."""
         with Session(self.engine) as session:
-            records = session.query(AssistData).filter_by(target_college=campus_key).all()
-            
-            if not records:
-                return []
-            
-            # Use most recent record
-            record = max(records, key=lambda r: r.updated_at)
-            json_data = record.agreements_json
-            category_list = json_data.get("categories", [])
-            
-            categories = []
-            for item in category_list:
-                if isinstance(item, dict) and "Category" in item:
-                    categories.append(item["Category"])
-            
-            return categories
+            query = session.query(TransferRule.category_name).filter_by(target_college=campus_key)
+            if year:
+                query = query.filter_by(academic_year=year)
+
+            records = query.distinct().all()
+            return sorted([r[0] for r in records if r[0]])
+
+    @staticmethod
+    def _course_domain(code: str, title: str = "", domain_hint: Optional[str] = None) -> str:
+        """Resolve domain using stored hint first, then fallback heuristics."""
+        if domain_hint in {"cs", "math", "science", "other"}:
+            return domain_hint
+        if PostgresRepository._is_cs_course(code, title):
+            return "cs"
+        if PostgresRepository._is_math_course(code, title):
+            return "math"
+        if PostgresRepository._is_science_course(code, title):
+            return "science"
+        return "other"
 
     @staticmethod
     def _is_cs_course(code: str, title: str = "") -> bool:
@@ -227,6 +164,49 @@ class PostgresRepository:
         """Check if course is science."""
         code = code.upper()
         return code.startswith(("PHYS-", "CHEM-", "BIOSC-", "BIOL-"))
+
+    # ==================== TRANSFER_RULES METHODS ====================
+
+    def replace_transfer_rules_for_campus(
+        self,
+        target_college: str,
+        academic_year: str,
+        rows: List[Dict],
+        source_college: str = "DVC",
+    ) -> int:
+        """
+        Replace all transfer rows for a campus/year with the provided row list.
+        This is the SQL-first ingestion path.
+        """
+        with Session(self.engine) as session:
+            session.query(TransferRule).filter_by(
+                source_college=source_college,
+                target_college=target_college,
+                academic_year=academic_year,
+            ).delete()
+
+            for row in rows:
+                rule = TransferRule(
+                    source_college=source_college,
+                    target_college=target_college,
+                    academic_year=academic_year,
+                    major=row.get("major"),
+                    category_name=row.get("category_name", ""),
+                    minimum_required=int(row.get("minimum_required") or 0),
+                    is_required=bool(row.get("is_required", False)),
+                    domain=(row.get("domain") or "other").lower(),
+                    dvc_course_code=row.get("dvc_course_code", ""),
+                    dvc_course_title=row.get("dvc_course_title", ""),
+                    dvc_units=row.get("dvc_units"),
+                    uc_course_code=row.get("uc_course_code"),
+                    uc_course_title=row.get("uc_course_title"),
+                    uc_units=row.get("uc_units"),
+                    updated_at=datetime.utcnow(),
+                )
+                session.add(rule)
+
+            session.commit()
+            return len(rows)
 
     # ==================== ASSIST_DATA METHODS ====================
 
@@ -260,7 +240,7 @@ class PostgresRepository:
             if existing:
                 # Update existing record
                 existing.agreements_json = agreements_json
-                existing.updated_at = existing.__table__.c.updated_at.server_default
+                existing.updated_at = datetime.utcnow()
                 session.commit()
                 session.refresh(existing)
                 return existing
@@ -344,13 +324,13 @@ class PostgresRepository:
         """
         with Session(self.engine) as session:
             query = session.query(ChatHistory).filter_by(session_id=session_id)
-            query = query.order_by(ChatHistory.timestamp.asc())
-            
+
             if limit:
-                # Get last N messages
-                query = query.limit(limit)
-            
-            return query.all()
+                # Fetch most recent N first, then reverse to keep oldest->newest order.
+                rows = query.order_by(ChatHistory.timestamp.desc()).limit(limit).all()
+                return list(reversed(rows))
+
+            return query.order_by(ChatHistory.timestamp.asc()).all()
 
     def delete_chat_history(self, session_id: str) -> int:
         """

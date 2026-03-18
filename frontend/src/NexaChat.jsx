@@ -31,15 +31,22 @@ function TypingIndicator() {
 
 
 export default function NexaChat() {
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      content: "👋 Hi! I'm NEXA — ask me anything about DVC → UC transfers. Here are some ideas to get started:",
-      prompts: suggestedPrompts,
-    },
-  ]);
+  const initialAssistantMessage = {
+    role: "assistant",
+    content: "👋 Hi! I'm NEXA — ask me anything about DVC → UC transfers. Here are some ideas to get started:",
+    prompts: suggestedPrompts,
+  };
+
+  const createClientSessionId = () => {
+    const randomPart = Math.random().toString(36).slice(2, 10);
+    const timePart = Date.now().toString(36);
+    return `sess_client_${timePart}_${randomPart}`;
+  };
+
+  const [messages, setMessages] = useState([initialAssistantMessage]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isNewChat, setIsNewChat] = useState(true);
   const chatEndRef = useRef(null);
 
   // Use explicit environment override or same-origin by default.
@@ -47,18 +54,48 @@ export default function NexaChat() {
   const apiBase = import.meta.env.VITE_API_BASE_URL || "";
 
   // NEW ADDITION: Stores session_id returned by backend so PDF download knows which session to export 
-  const [sessionId, setSessionId] = useState(null);
+  const [sessionId, setSessionId] = useState(() => createClientSessionId());
+  const sessionIdRef = useRef(sessionId);
 
   // NEW ADDITION: Tracks the time user focused the input box, used to calculate typing time for bot detection 
   const focusTimeRef = useRef(null);
 
   // NEW ADDITION: Tracks whether a CAPTCHA challenge is required before user can send again 
   const [captchaRequired, setCaptchaRequired] = useState(false);
+  const tabWasHiddenRef = useRef(false);
   
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        tabWasHiddenRef.current = true;
+        return;
+      }
+
+      if (!tabWasHiddenRef.current) {
+        return;
+      }
+
+      tabWasHiddenRef.current = false;
+      const freshSession = createClientSessionId();
+      setSessionId(freshSession);
+      sessionIdRef.current = freshSession;
+      setMessages([initialAssistantMessage]);
+      setInput("");
+      setCaptchaRequired(false);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
 
   async function sendMessage(promptText) {
     const text = (typeof promptText === 'string' ? promptText : input).trim();
@@ -87,11 +124,14 @@ export default function NexaChat() {
       console.log(`[DEBUG] Sending prompt to ${apiBase}/prompt:`, text);
       const res = await fetch(`${apiBase}/prompt`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: text,
           // NEW ADDITION: session_id maintains conversation context across messages
-          session_id: sessionId || undefined,
+          session_id: sessionIdRef.current || undefined,
+          // Force backend to start a fresh session on the first message after entering chat.
+          new_chat: isNewChat,
           // NEW ADDITION: timing_ms lets backend detect instant/bot submissions 
           timing_ms: timingMs,
           // NEW ADDITION: honeypot field - always empty for real users, bots often fill hidden fields 
@@ -138,6 +178,10 @@ export default function NexaChat() {
       // NEW ADDITION: save session_id from backend so it can be reused as a PDF download 
       if (data.session_id) {
         setSessionId(data.session_id);
+        sessionIdRef.current = data.session_id;
+      }
+      if (isNewChat) {
+        setIsNewChat(false);
       }
       
 
@@ -175,6 +219,7 @@ export default function NexaChat() {
     try {
       const res = await fetch(`${apiBase}/download-chat`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId, summary_only: false }),
       });
@@ -202,6 +247,7 @@ export default function NexaChat() {
     try {
       const res = await fetch(`${apiBase}/download-chat`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId, summary_only: true }),
       });

@@ -6,6 +6,8 @@ The project includes a Python/Flask backend with PostgreSQL database (LLM parsin
 
 **🎉 NEW: PostgreSQL Migration Complete!** All course data now stored in PostgreSQL for better scalability and performance. See [POSTGRES_MIGRATION.md](POSTGRES_MIGRATION.md) for details.
 
+**SQL-first conversion in progress:** course reads now target `transfer_rules` (flat SQL rows). Use `python scripts/migrate_assist_to_transfer_rules.py` to backfill rows from existing PostgreSQL `assist_data` records.
+
 ## High-level structure
 - `app.py` — Flask server that exposes the UI and the `/prompt` endpoint.
 - `backend/` — Backend code (AI agent, database models, repository layer).
