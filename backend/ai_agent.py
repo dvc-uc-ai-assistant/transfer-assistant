@@ -175,6 +175,45 @@ def parse_completed_freeform(text: str) -> Set[str]:
         tokens.add(_normalize_single_code(code))
     return tokens
 
+
+def _history_to_context_lines(history: Optional[List[Dict[str, Any]]], max_messages: int = 8) -> List[str]:
+    """Convert recent chat history into compact lines for LLM context."""
+    if not history:
+        return []
+
+    lines: List[str] = []
+    for msg in history[-max_messages:]:
+        if not isinstance(msg, dict):
+            continue
+        role = str(msg.get("role", "")).strip().lower()
+        if role not in {"user", "assistant"}:
+            continue
+        content = str(msg.get("content", "")).strip()
+        if not content:
+            continue
+        content = content.replace("\n", " ")
+        if len(content) > 350:
+            content = content[:350] + "..."
+        lines.append(f"{role}: {content}")
+    return lines
+
+
+def _detect_campuses_from_history(history: Optional[List[Dict[str, Any]]], max_messages: int = 8) -> List[str]:
+    """Infer campus context from recent user messages when current turn is underspecified."""
+    if not history:
+        return []
+
+    found: List[str] = []
+    for msg in history[-max_messages:]:
+        if not isinstance(msg, dict):
+            continue
+        if str(msg.get("role", "")).strip().lower() != "user":
+            continue
+        content = str(msg.get("content", ""))
+        found.extend(detect_campuses_from_query(content))
+
+    return sorted(set(found))
+
 def parse_preferences_seed(q: str) -> dict:
     t = " " + q.lower().strip() + " "
     want_cs = any(x in t for x in [" cs ", "comsc", "computer science", "programming", "data structures"])
@@ -216,7 +255,11 @@ def init_database() -> PostgresRepository:
 # filter_rows and related helper functions removed - repository handles filtering
 
 #LLM: single-turn structured parser
-def llm_parse_user_message(client: OpenAI, user_message: str) -> Dict[str, Any]:
+def llm_parse_user_message(
+    client: OpenAI,
+    user_message: str,
+    conversation_history: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
     """
     Return JSON like:
     {
@@ -254,16 +297,27 @@ def llm_parse_user_message(client: OpenAI, user_message: str) -> Dict[str, Any]:
         "filters.completed_courses: array of normalized DVC course codes (DEPT-NUM) if the user lists them.\n"
         "filters.categories: array of category names/phrases the user requests (e.g., 'major preparation','breadth','general education'). "
         "Use the user's wording; do not invent categories.\n"
+        "When prior conversation context is provided, use it to resolve references like 'that campus', 'those classes', or 'what about Davis'. "
+        "Prefer explicit details in the current user message; use history only when needed to disambiguate.\n"
         "If unsure, return null or empty arrays rather than guessing."
     )
+
+    history_lines = _history_to_context_lines(conversation_history)
+    history_block = "\n".join(history_lines)
+
     try:
+        messages = [{"role": "system", "content": system}]
+        if history_block:
+            messages.append({
+                "role": "user",
+                "content": "Recent conversation context (oldest to newest):\n" + history_block,
+            })
+        messages.append({"role": "user", "content": "Current user message:\n" + user_message})
+
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
             response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user_message},
-            ],
+            messages=messages,
             temperature=0
         )
         data = json.loads(resp.choices[0].message.content)
@@ -283,6 +337,8 @@ def llm_parse_user_message(client: OpenAI, user_message: str) -> Dict[str, Any]:
         if isinstance(single_campus, str) and single_campus.strip():
             campuses_raw.append(single_campus)
         campuses_raw.extend(detect_campuses_from_query(user_message))
+        if not campuses_raw:
+            campuses_raw.extend(_detect_campuses_from_history(conversation_history))
 
         campuses_norm: List[str] = []
         for c in campuses_raw:
@@ -472,7 +528,8 @@ def llm_format_response_multi(client: OpenAI,
                               parsed: Dict[str, Any],
                               completed_courses: Set[str],
                               completed_domains: Set[str],
-                              plain: bool = False) -> str:
+                              plain: bool = False,
+                              conversation_history: Optional[List[Dict[str, Any]]] = None) -> str:
     chunks = []
     for ck in campus_keys:
         rows = campus_to_rows.get(ck, [])
@@ -482,7 +539,7 @@ def llm_format_response_multi(client: OpenAI,
     
     # Join campus sections and add a single "Next Steps" section at the end
     response = "\n\n".join(chunks)
-    
+
     # Add unified next steps
     campus_names = ", ".join([PRETTY_CAMPUS.get(ck, ck) for ck in campus_keys])
     response += "\n\n### Next Steps\n"
@@ -826,16 +883,22 @@ def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: 
         "history": session_state.get("history", []),
     }
     
-    # Parse user message
-    parsed = llm_parse_user_message(client, prompt)
+    # Use only in-memory session history for conversational context.
+    # Persisted DB history is still written for auditing/export, but not used for live context resolution.
+    in_memory_history = session_state.get("history", []) if isinstance(session_state, dict) else []
+    conversation_history = in_memory_history
+
+    # Parse user message with context from prior turns.
+    parsed = llm_parse_user_message(client, prompt, conversation_history=conversation_history)
     
-    # Determine campuses for this session
+    # Determine campuses for this session.
+    # Explicit campus mentions in the current prompt always override prior session context.
     available = repo.get_campuses()
     campus_keys = session_state.get("campuses", [])
-    
-    if not campus_keys:
-        # First message - detect from query
-        campus_keys = parsed.get("parameters", {}).get("campuses") or detect_campuses_from_query(prompt)
+    prompt_campuses = parsed.get("parameters", {}).get("campuses") or detect_campuses_from_query(prompt)
+
+    if prompt_campuses:
+        campus_keys = prompt_campuses
     
     if not campus_keys:
         error_msg = "Sorry, I couldn't detect a campus. Try UC Berkeley (UCB), UC Davis (UCD), or UC San Diego (UCSD)."
@@ -878,7 +941,8 @@ def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: 
         parsed,
         completed_courses,
         completed_domains,
-        plain=True  # Use deterministic formatting for API
+        plain=True,  # Keep deterministic API formatting while using contextual parsing.
+        conversation_history=conversation_history,
     )
     
     # Update session state
@@ -959,10 +1023,10 @@ def main():
         #campuses for this session
         available = repo.get_campuses()
         campus_keys = session_state.get("campuses", [])
-        
-        if not campus_keys:
-            # First message - detect from query
-            campus_keys = parsed.get("parameters", {}).get("campuses") or detect_campuses_from_query(user_q)
+        prompt_campuses = parsed.get("parameters", {}).get("campuses") or detect_campuses_from_query(user_q)
+
+        if prompt_campuses:
+            campus_keys = prompt_campuses
         
         if not campus_keys:
             # Output state first, then error message
