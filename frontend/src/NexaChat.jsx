@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import MarkdownIt from "markdown-it";
 import "./Chat.css";
 
+const CHAT_STORAGE_KEY = "nexa_chat_state_v1";
+
 // initialize markdown-it with table support
 const md = new MarkdownIt({
   html: true,
@@ -31,15 +33,49 @@ function TypingIndicator() {
 
 
 export default function NexaChat() {
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      content: "👋 Hi! I'm NEXA — ask me anything about DVC → UC transfers. Here are some ideas to get started:",
-      prompts: suggestedPrompts,
-    },
-  ]);
-  const [input, setInput] = useState("");
+  const initialAssistantMessage = {
+    role: "assistant",
+    content: "👋 Hi! I'm NEXA — ask me anything about DVC → UC transfers. Here are some ideas to get started:",
+    prompts: suggestedPrompts,
+  };
+
+  const createClientSessionId = () => {
+    const randomPart = Math.random().toString(36).slice(2, 10);
+    const timePart = Date.now().toString(36);
+    return `sess_client_${timePart}_${randomPart}`;
+  };
+
+  const loadPersistedChatState = () => {
+    try {
+      const raw = sessionStorage.getItem(CHAT_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  };
+
+  const persistedStateRef = useRef(undefined);
+  if (persistedStateRef.current === undefined) {
+    persistedStateRef.current = loadPersistedChatState();
+  }
+  const persistedState = persistedStateRef.current;
+
+  const [messages, setMessages] = useState(() => {
+    const persistedMessages = persistedState?.messages;
+    return Array.isArray(persistedMessages) && persistedMessages.length
+      ? persistedMessages
+      : [initialAssistantMessage];
+  });
+  const [input, setInput] = useState(() =>
+    typeof persistedState?.input === "string" ? persistedState.input : ""
+  );
   const [loading, setLoading] = useState(false);
+  const [isNewChat, setIsNewChat] = useState(() =>
+    typeof persistedState?.isNewChat === "boolean" ? persistedState.isNewChat : true
+  );
   const chatEndRef = useRef(null);
 
   // Use explicit environment override or same-origin by default.
@@ -47,18 +83,47 @@ export default function NexaChat() {
   const apiBase = import.meta.env.VITE_API_BASE_URL || "";
 
   // NEW ADDITION: Stores session_id returned by backend so PDF download knows which session to export 
-  const [sessionId, setSessionId] = useState(null);
+  const [sessionId, setSessionId] = useState(() => {
+    const persistedSessionId = persistedState?.sessionId;
+    return typeof persistedSessionId === "string" && persistedSessionId
+      ? persistedSessionId
+      : createClientSessionId();
+  });
+  const sessionIdRef = useRef(sessionId);
 
   // NEW ADDITION: Tracks the time user focused the input box, used to calculate typing time for bot detection 
   const focusTimeRef = useRef(null);
 
   // NEW ADDITION: Tracks whether a CAPTCHA challenge is required before user can send again 
-  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [captchaRequired, setCaptchaRequired] = useState(() =>
+    typeof persistedState?.captchaRequired === "boolean" ? persistedState.captchaRequired : false
+  );
   
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        CHAT_STORAGE_KEY,
+        JSON.stringify({
+          messages,
+          input,
+          isNewChat,
+          sessionId,
+          captchaRequired,
+        })
+      );
+    } catch {
+      // Ignore sessionStorage write errors (private mode/quota).
+    }
+  }, [messages, input, isNewChat, sessionId, captchaRequired]);
 
   async function sendMessage(promptText) {
     const text = (typeof promptText === 'string' ? promptText : input).trim();
@@ -87,11 +152,14 @@ export default function NexaChat() {
       console.log(`[DEBUG] Sending prompt to ${apiBase}/prompt:`, text);
       const res = await fetch(`${apiBase}/prompt`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: text,
           // NEW ADDITION: session_id maintains conversation context across messages
-          session_id: sessionId || undefined,
+          session_id: sessionIdRef.current || undefined,
+          // Force backend to start a fresh session on the first message after entering chat.
+          new_chat: isNewChat,
           // NEW ADDITION: timing_ms lets backend detect instant/bot submissions 
           timing_ms: timingMs,
           // NEW ADDITION: honeypot field - always empty for real users, bots often fill hidden fields 
@@ -138,6 +206,10 @@ export default function NexaChat() {
       // NEW ADDITION: save session_id from backend so it can be reused as a PDF download 
       if (data.session_id) {
         setSessionId(data.session_id);
+        sessionIdRef.current = data.session_id;
+      }
+      if (isNewChat) {
+        setIsNewChat(false);
       }
       
 
@@ -175,6 +247,7 @@ export default function NexaChat() {
     try {
       const res = await fetch(`${apiBase}/download-chat`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId, summary_only: false }),
       });
@@ -202,6 +275,7 @@ export default function NexaChat() {
     try {
       const res = await fetch(`${apiBase}/download-chat`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId, summary_only: true }),
       });

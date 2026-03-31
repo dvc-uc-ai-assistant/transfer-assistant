@@ -1,10 +1,12 @@
 """
 SQLAlchemy ORM models for Transfer Assistant database.
-Simplified two-table architecture using JSON storage.
+
+This module now includes a SQL-first transfer_rules table used for course
+retrieval. Legacy assist_data is kept for staged migration.
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Index, Text, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Index, Text, JSON, Boolean, Numeric
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -34,6 +36,63 @@ class AssistData(Base):
 
     def __repr__(self):
         return f"<AssistData(id={self.id}, source='{self.source_college}', target='{self.target_college}', major='{self.major}')>"
+
+
+class TransferRule(Base):
+    """
+    Table 1 (SQL-first): Transfer rule rows used by the backend query layer.
+    Each row represents one DVC <-> UC course mapping within a category.
+    """
+    __tablename__ = "transfer_rules"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    source_college = Column(String(20), nullable=False, index=True)   # e.g., DVC
+    target_college = Column(String(20), nullable=False, index=True)   # e.g., UCB/UCD/UCSD
+    academic_year = Column(String(20), nullable=False, index=True)    # e.g., 2025-2026
+    major = Column(String(120), nullable=True, index=True)
+
+    category_name = Column(String(200), nullable=False, index=True)
+    minimum_required = Column(Integer, nullable=False, default=0)
+    is_required = Column(Boolean, nullable=False, default=False, index=True)
+    domain = Column(String(20), nullable=False, default="other", index=True)
+
+    dvc_course_code = Column(String(40), nullable=False, index=True)
+    dvc_course_title = Column(Text, nullable=False)
+    dvc_units = Column(Numeric(4, 1), nullable=True)
+
+    uc_course_code = Column(String(40), nullable=True, index=True)
+    uc_course_title = Column(Text, nullable=True)
+    uc_units = Column(Numeric(4, 1), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        # Used by the primary assistant retrieval path.
+        Index("idx_transfer_campus_year", "target_college", "academic_year"),
+        Index("idx_transfer_campus_category", "target_college", "category_name"),
+        Index("idx_transfer_campus_domain", "target_college", "domain"),
+        Index("idx_transfer_required", "target_college", "is_required"),
+        Index(
+            "idx_transfer_dedupe",
+            "source_college",
+            "target_college",
+            "academic_year",
+            "major",
+            "category_name",
+            "dvc_course_code",
+            "uc_course_code",
+            unique=False,
+        ),
+    )
+
+    def __repr__(self):
+        return (
+            f"<TransferRule(id={self.id}, source='{self.source_college}', "
+            f"target='{self.target_college}', dvc='{self.dvc_course_code}', "
+            f"uc='{self.uc_course_code}')>"
+        )
 
 
 class ChatHistory(Base):
