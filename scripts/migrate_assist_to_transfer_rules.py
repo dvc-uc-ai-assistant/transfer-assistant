@@ -29,14 +29,33 @@ def _to_decimal(value):
         return None
 
 
-def _extract_uc_info(course_item: Dict) -> Dict:
-    # The legacy payload used one of these keys per campus.
-    return (
-        course_item.get("UC_Berkeley")
-        or course_item.get("UC_Davis")
-        or course_item.get("UC_San_Diego")
-        or {}
-    )
+UC_INFO_KEYS_BY_CAMPUS = {
+    "UCB": ["UC_Berkeley", "UC Berkeley"],
+    "UCD": ["UC_Davis", "UC Davis"],
+    "UCSD": [
+        "UC_SanDiego",
+        "UC_San_Diego",
+        "UC San Diego",
+        "UCSD",
+    ],
+}
+
+
+def _extract_uc_info(course_item: Dict, target_college: str) -> Dict:
+    """Extract UC-side articulation info using the target campus key first."""
+    for key in UC_INFO_KEYS_BY_CAMPUS.get((target_college or "").upper(), []):
+        uc_info = course_item.get(key)
+        if isinstance(uc_info, dict):
+            return uc_info
+
+    # Fallback for legacy payload variants with unexpected key names.
+    for key, value in course_item.items():
+        if not isinstance(key, str) or not isinstance(value, dict):
+            continue
+        if key.upper().startswith("UC"):
+            return value
+
+    return {}
 
 
 def _iter_transfer_rows(repo: PostgresRepository, record: AssistData) -> List[Dict]:
@@ -66,7 +85,7 @@ def _iter_transfer_rows(repo: PostgresRepository, record: AssistData) -> List[Di
             if not isinstance(course_item, dict):
                 continue
 
-            uc_info = _extract_uc_info(course_item)
+            uc_info = _extract_uc_info(course_item, record.target_college)
             dvc_info = course_item.get("DVC", {})
             dvc_list = dvc_info if isinstance(dvc_info, list) else [dvc_info]
 
