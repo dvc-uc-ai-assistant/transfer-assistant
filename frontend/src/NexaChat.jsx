@@ -78,8 +78,6 @@ export default function NexaChat() {
   );
   const chatEndRef = useRef(null);
 
-  // Use explicit environment override or same-origin by default.
-  // In Vite dev this works with proxy config; in Cloud Run it hits the same service.
   const apiBase = import.meta.env.VITE_API_BASE_URL || "";
 
   // NEW ADDITION: Stores session_id returned by backend so PDF download knows which session to export 
@@ -129,7 +127,6 @@ export default function NexaChat() {
     const text = (typeof promptText === 'string' ? promptText : input).trim();
     if (!text) return;
 
-    // NEW ADDITION: Block sending if CAPTCHA is required - shows message and exits early
     if (captchaRequired) {
       setMessages((prev) => [
         ...prev,
@@ -137,19 +134,15 @@ export default function NexaChat() {
       ]);
       return;
     }
-    
 
     setMessages((prev) => [...prev, { role: "user", content: text }]);
     setInput("");
     setLoading(true);
 
-    // NEW ADDITION: Calculate ms between input focus and send - passed to backend for bot timing detection 
     const timingMs = focusTimeRef.current ? Date.now() - focusTimeRef.current : 0;
     focusTimeRef.current = null;
-    
 
     try {
-      console.log(`[DEBUG] Sending prompt to ${apiBase}/prompt:`, text);
       const res = await fetch(`${apiBase}/prompt`, {
         method: "POST",
         credentials: "include",
@@ -162,14 +155,10 @@ export default function NexaChat() {
           new_chat: isNewChat,
           // NEW ADDITION: timing_ms lets backend detect instant/bot submissions 
           timing_ms: timingMs,
-          // NEW ADDITION: honeypot field - always empty for real users, bots often fill hidden fields 
           _confirm: "",
         }),
       });
 
-      console.log(`[DEBUG] Response status: ${res.status}`);
-
-      // NEW ADDITION: handle CAPTCHA required response from bot detection (429 with captcha_required flag) 
       if (res.status === 429) {
         const data = await res.json().catch(() => ({}));
         if (data.captcha_required) {
@@ -182,9 +171,7 @@ export default function NexaChat() {
           return;
         }
       }
-      
 
-      // NEW ADDITION: handle hard block response from bot detection (403 blocked) 
       if (res.status === 403) {
         setMessages((prev) => [
           ...prev,
@@ -193,17 +180,14 @@ export default function NexaChat() {
         setLoading(false);
         return;
       }
-      
 
       if (!res.ok) {
         const t = await res.text().catch(() => "");
-        console.error(`[DEBUG] Error response: ${t}`);
         throw new Error(t || `HTTP ${res.status}`);
       }
-      const data = await res.json();
-      console.log(`[DEBUG] Response data:`, data);
 
-      // NEW ADDITION: save session_id from backend so it can be reused as a PDF download 
+      const data = await res.json();
+
       if (data.session_id) {
         setSessionId(data.session_id);
         sessionIdRef.current = data.session_id;
@@ -211,10 +195,8 @@ export default function NexaChat() {
       if (isNewChat) {
         setIsNewChat(false);
       }
-      
 
       const reply = data.response || "Hmm, I didn't get a response.";
-      console.log(`[DEBUG] Reply content length: ${reply.length}`);
       setMessages((prev) => [...prev, { role: "bot", content: reply }]);
     } catch (err) {
       console.error("[DEBUG] Fetch error:", err);
@@ -238,7 +220,7 @@ export default function NexaChat() {
     }
   }
 
-  // NEW ADDITION: fetches /download-chat and triggers a full conversation PDF download 
+  // fetches /download-chat and triggers a full conversation PDF download
   async function downloadChat() {
     if (!sessionId) {
       alert("No conversation to download yet!");
@@ -249,7 +231,7 @@ export default function NexaChat() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, summary_only: false }),
+        body: JSON.stringify({ session_id: sessionId }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
@@ -264,35 +246,6 @@ export default function NexaChat() {
       alert("⚠️ Could not download chat. Please try again.");
     }
   }
-  
-
-  // NEW ADDITION: fetches /download-chat with summary_only=true and triggers an AI summary PDF download 
-  async function downloadSummary() {
-    if (!sessionId) {
-      alert("No conversation to summarize yet!");
-      return;
-    }
-    try {
-      const res = await fetch(`${apiBase}/download-chat`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, summary_only: true }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "nexa-summary.pdf";
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("[DEBUG] Download summary error:", err);
-      alert("⚠️ Could not download summary. Please try again.");
-    }
-  }
-  
 
   return (
     <div className="nexa-chat-card">
@@ -332,7 +285,7 @@ export default function NexaChat() {
         <div ref={chatEndRef} />
       </div>
 
-      {/* NEW ADDITION: download buttons - only visible once a conversation has started */}
+      {/* download button - only visible once a conversation has started */}
       {sessionId && (
         <div className="nexa-download-row">
           <button
@@ -342,19 +295,11 @@ export default function NexaChat() {
           >
             ⬇ Download Chat
           </button>
-          <button
-            className="nexa-download-button"
-            onClick={downloadSummary}
-            disabled={loading}
-          >
-            ⬇ Download Summary
-          </button>
         </div>
       )}
-      {/* END ADDITION */}
 
       <form className="nexa-input-row" onSubmit={(e) => { e.preventDefault(); sendMessage(); }}>
-        {/* NEW ADDITION: Honeypot hidden field - real users never see or fill this, bots often do */}
+        {/* Honeypot hidden field - real users never see or fill this, bots often do */}
         <input
           type="text"
           name="_confirm"
@@ -364,7 +309,6 @@ export default function NexaChat() {
           readOnly
           value=""
         />
-        {/* END OF ADDITION */}
         <input
           className="nexa-text-input"
           type="text"
@@ -373,9 +317,7 @@ export default function NexaChat() {
           onChange={(e) => setInput(e.target.value)}
           onFocus={(e) => {
             e.currentTarget.classList.add('focus');
-            // NEW ADDITION: Record focus time for bot timing detection 
             focusTimeRef.current = Date.now();
-            
           }}
           onBlur={(e) => e.currentTarget.classList.remove('focus')}
         />

@@ -269,6 +269,13 @@ def handle_prompt():
     input_block = check_input_guardrails(user_prompt, session_id)
     if input_block:
         guardrail_log("input_blocked_by_guardrail", session_id, {"reason": input_block[:80]})
+        if session_id not in sessions:
+            sessions[session_id] = {
+                "campuses": [], "completed_courses": [],
+                "completed_domains": [], "categories": [], "history": [],
+            }
+        sessions[session_id]["history"].append({"role": "user", "content": user_prompt})
+        sessions[session_id]["history"].append({"role": "assistant", "content": input_block})
         return jsonify({"response": input_block, "session_id": session_id}), 200
 
     # session init / retrieval
@@ -351,21 +358,8 @@ def download_chat():
     if not history:
         return jsonify({"error": "No conversation history found."}), 400
 
-    if summary_only:
-        transcript = "\n".join(
-            f"{m['role'].upper()}: {m['content']}" for m in history
-        )
-        summary_prompt = f"Please summarize the key points of this conversation:\n\n{transcript}"
-        try:
-            summary, _ = get_response_with_timeout(summary_prompt, sessions[session_id], session_id)
-            messages = [{"role": "assistant", "content": summary}]
-            title = "Conversation Summary"
-        except Exception:
-            logger.exception("Failed to generate summary for PDF")
-            return jsonify({"error": "Could not generate summary. Please try again."}), 500
-    else:
-        messages = history
-        title = "Chat Conversation"
+    messages = history
+    title = "Chat Conversation"
 
     pdf_buffer = generate_chat_pdf(messages, title=title)
     return send_file(
