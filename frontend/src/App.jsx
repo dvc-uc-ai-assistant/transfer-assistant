@@ -1,16 +1,24 @@
-import { BrowserRouter, NavLink, Route, Routes } from "react-router-dom";
-import { useState } from "react";
+import { BrowserRouter, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import Home from "./Home";
 import Chat from "./Chat";
 import Contact from "./Contact";
 import HowTo from "./HowTo";
 
-export default function App() {
+const CHAT_STORAGE_KEY = "nexa_chat_state_v1";
+
+function AppShell() {
   const [navOpen, setNavOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.pathname !== "/chat") {
+      sessionStorage.removeItem(CHAT_STORAGE_KEY);
+    }
+  }, [location.pathname]);
 
   return (
-    <BrowserRouter>
-      <div className="app-shell">
+    <div className="app-shell">
         <nav className={"navbar" + (navOpen ? " open" : "") } aria-hidden={!navOpen && window.innerWidth <= 900}>
           <div className="navbar-inner">
             <div className="nav-header">
@@ -47,7 +55,14 @@ export default function App() {
         <footer style={{ textAlign: "center", padding: "1rem", opacity: .7 }}>
           © {new Date().getFullYear()} NEXA
         </footer>
-      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppShell />
     </BrowserRouter>
   );
 }

@@ -196,6 +196,11 @@ def handle_prompt():
     session_id = ""
     if isinstance(req_data, dict):
         session_id = (req_data.get("session_id") or "").strip()
+
+    # Force a fresh server session for the first message of a newly entered chat UI.
+    if isinstance(req_data, dict) and bool(req_data.get("new_chat", False)):
+        session_id = new_session_id()
+
     session_id = session_id or new_session_id()
 
     if req_data is None:
