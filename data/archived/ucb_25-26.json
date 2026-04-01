@@ -59,14 +59,16 @@
                     },
                     "DVC": [
                         {
-                            "Course_Code": "COMPSC-140",
+                            "Course_Code": "COMSC-140",
                             "Title": "Python Programming",
-                            "Units": 3
+                            "Units": 3,
+                            "Note": "Must complete an additional university course after transfer to satisfy this requirement"
                         },
                         {
-                            "Course_Code": "COMPSC-240/MATH 192",
+                            "Course_Code": "COMSC-240/MATH 192",
                             "Title": "Advanced Python Programming/Analytic Geometry and Calculus 1",
-                            "Units": 8
+                            "Units": 8,
+                            "Note": "Must complete an additional university course after transfer to satisfy this requirement"
                         }
                     ]
                 },

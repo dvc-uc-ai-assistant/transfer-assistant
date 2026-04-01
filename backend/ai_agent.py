@@ -468,7 +468,7 @@ def llm_format_response(client: OpenAI,
         if not skip_next_steps:
             lines.append("\n### Next Steps\n")
             lines.append(f"1. Review the courses above for {campus_name}")
-            lines.append("2. Check prerequisites and course schedules")
+            lines.append("2. Check registration details and prerequisites on [CourseGenie](https://example.com/coursegenie)")
             lines.append("3. Plan your semester enrollment based on availability")
             lines.append("4. Ask about specific courses or transfer requirements")
         
@@ -536,7 +536,7 @@ def llm_format_response(client: OpenAI,
     if not skip_next_steps:
         lines.append("\n### Next Steps\n")
         lines.append(f"1. Review the courses above for {campus_name}")
-        lines.append("2. Check prerequisites and course schedules")
+        lines.append("2. Check registration details and prerequisites on [CourseGenie](https://example.com/coursegenie)")
         lines.append("3. Plan your semester enrollment")
         lines.append("4. Ask about specific courses or requirements")
     
@@ -565,7 +565,7 @@ def llm_format_response_multi(client: OpenAI,
     campus_names = ", ".join([PRETTY_CAMPUS.get(ck, ck) for ck in campus_keys])
     response += "\n\n### Next Steps\n"
     response += f"1. Review the courses above for {campus_names}\n"
-    response += "2. Check prerequisites and course schedules\n"
+    response += "2. Check registration details and prerequisites on [CourseGenie](https://example.com/coursegenie)\n"
     response += "3. Plan your semester enrollment based on availability\n"
     response += "4. Ask about specific courses or transfer requirements"
     
