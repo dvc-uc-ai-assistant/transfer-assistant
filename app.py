@@ -37,11 +37,11 @@ logger.addHandler(handler)
 
 # import AI agent directly
 from backend.ai_agent import get_response  # noqa: E402
+from backend.ai_agent import get_repository  # noqa: E402
 
 # ENV & PATHS
-load_dotenv()
-
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(ROOT_DIR, ".env"))
 REACT_DIST = os.path.join(ROOT_DIR, "frontend", "dist")
 
 # FLASK APP
@@ -350,10 +350,19 @@ def download_chat():
     session_id   = req_data.get("session_id", "")
     summary_only = req_data.get("summary_only", False)
 
-    if session_id not in sessions:
-        return jsonify({"error": "Session not found"}), 404
+    history = sessions.get(session_id, {}).get("history", [])
+    if not history:
+        try:
+            repo = get_repository()
+            history = [
+                {"role": row.role, "content": row.content}
+                for row in repo.get_chat_history(session_id)
+            ]
+        except Exception:
+            history = []
 
-    history = sessions[session_id].get("history", [])
+    if not history:
+        return jsonify({"error": "Session not found"}), 404
 
     if not history:
         return jsonify({"error": "No conversation history found."}), 400
