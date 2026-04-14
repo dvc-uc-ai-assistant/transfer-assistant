@@ -2,7 +2,7 @@
 # Scope: Transfer-only; Campuses: UCB / UCD / UCSD
 # Adds: Multi-campus selection + Category filtering (to merge Dani's + Eleni's approaches)
 
-import os, json, re, csv, argparse, uuid, sys
+import os, json, re, csv, argparse, uuid, sys, logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 from dotenv import load_dotenv
@@ -18,12 +18,14 @@ except ModuleNotFoundError:
 # ============================================
 # MODULE-LEVEL INITIALIZATION (for API use)
 # ============================================
-# Load environment once when module is imported
-load_dotenv()
+# Load environment once when module is imported (with explicit path for reliability)
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(_root, ".env"))
 
 # Initialize OpenAI client globally (reused across requests)
 _client: Optional[OpenAI] = None
 _repo: Optional[PostgresRepository] = None
+logger = logging.getLogger(__name__)
 
 def get_client() -> OpenAI:
     """Get or create OpenAI client (singleton pattern)."""
@@ -42,6 +44,40 @@ def get_repository() -> PostgresRepository:
         database_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/transfer_assistant")
         _repo = PostgresRepository(database_url)
     return _repo
+
+
+def _chat_history_to_dicts(history: List[Any]) -> List[Dict[str, Any]]:
+    """Normalize ChatHistory ORM rows into the dict shape used by the parser."""
+    normalized: List[Dict[str, Any]] = []
+    for msg in history:
+        role = getattr(msg, "role", None)
+        content = getattr(msg, "content", None)
+        if not role or content is None:
+            continue
+        normalized.append({"role": str(role), "content": str(content)})
+    return normalized
+
+
+def _load_persisted_history(repo: PostgresRepository, session_id: str, limit: int = 16) -> List[Dict[str, Any]]:
+    """Fetch chat history with a retry for transient Cloud SQL connection issues."""
+    for attempt in (1, 2):
+        try:
+            persisted_history = repo.get_chat_history(session_id, limit=limit)
+            return _chat_history_to_dicts(persisted_history)
+        except Exception as exc:
+            logger.exception(
+                "chat_history_read_failed session_id=%s attempt=%s error=%s",
+                session_id,
+                attempt,
+                str(exc),
+            )
+            if attempt == 1:
+                # Dispose stale pooled connections before retrying once.
+                try:
+                    repo.engine.dispose()
+                except Exception:
+                    pass
+    return []
 
 #campus config (3 only)
 CAMPUS_ALIASES = {
@@ -318,8 +354,21 @@ def llm_parse_user_message(
         "filters.completed_courses: array of normalized DVC course codes (DEPT-NUM) if the user lists them.\n"
         "filters.categories: array of category names/phrases the user requests (e.g., 'major preparation','breadth','general education'). "
         "Use the user's wording; do not invent categories.\n"
-        "When prior conversation context is provided, use it to resolve references like 'that campus', 'those classes', or 'what about Davis'. "
+        "Interpretation precedence: "
+        "(1) explicit filter words in current message, "
+        "(2) explicit campus in current message, "
+        "(3) unresolved references from recent conversation context.\n"
+        "When prior conversation context is provided, resolve references like 'science only', 'math only', 'required only', 'that campus', 'those classes', or 'what about Davis'. "
         "Prefer explicit details in the current user message; use history only when needed to disambiguate.\n"
+        "Follow-up constraints:\n"
+        "- If current message says 'science only' or 'math only', set filters.focus_only accordingly even if campus is only in history.\n"
+        "- If current message says 'required only', set filters.required_only=true and keep prior campus context when campus is omitted.\n"
+        "- If user asks for category filtering (e.g., 'category: major preparation', 'show breadth only'), populate filters.categories with those phrases.\n"
+        "- Do not set filters.focus_only='all' for narrow requests like 'science only' or 'math only'.\n"
+        "Examples:\n"
+        "- History: user asked about UC Berkeley CS; Current: 'science only' -> campus UCB from history, focus_only='science'.\n"
+        "- History: user asked about UC Davis; Current: 'required only' -> campus UCD from history, required_only=true.\n"
+        "- Current: 'filter by category major preparation for UCSD' -> campus UCSD, categories=['major preparation'].\n"
         "If unsure, return null or empty arrays rather than guessing."
     )
 
@@ -407,6 +456,16 @@ def llm_parse_user_message(
         cats_local = normalize_categories_freeform(user_message)
         merged_cats = sorted(set([c for c in cats if isinstance(c, str) and c.strip()] + cats_local))
 
+        # Local fallback for explicit follow-up phrases the LLM sometimes misses.
+        # This keeps "science only", "math only", and "required only" working even in cloud deployments.
+        seed_prefs = parse_preferences_seed(user_message)
+        seed_focus = seed_prefs.get("exclusive_domain")
+        if seed_focus:
+            focus = seed_focus
+        if seed_prefs.get("required_only"):
+            filt["required_only"] = True
+        filt["focus_only"] = focus
+
         # Clear categories if the normalized domain focus is already set
         focus_norm = filt.get("focus_only")
         if isinstance(focus_norm, str):
@@ -417,10 +476,30 @@ def llm_parse_user_message(
         filt["categories"] = merged_cats
 
         return data
-    except Exception:
+    except Exception as exc:
+        logger.exception("llm_parse_user_message_failed error=%s", str(exc))
+
+        campuses_raw = detect_campuses_from_query(user_message)
+        if not campuses_raw:
+            campuses_raw = _detect_campuses_from_history(conversation_history)
+
+        campuses_norm: List[str] = []
+        for c in campuses_raw:
+            if not isinstance(c, str):
+                continue
+            det = detect_campus_from_query(c) or c.upper().strip()
+            if det in PRETTY_CAMPUS:
+                campuses_norm.append(det)
+        campuses_norm = sorted(set(campuses_norm))
+
         return {
             "intent": "find_requirements",
-            "parameters": {"campus": None, "campuses": [], "target_course_code": None, "target_institution": None},
+            "parameters": {
+                "campus": campuses_norm[0] if campuses_norm else None,
+                "campuses": campuses_norm,
+                "target_course_code": None,
+                "target_institution": None,
+            },
             "filters": {"focus_only": None, "required_only": False, "domains_completed": [], "completed_courses": [], "categories": []}
         }
 
@@ -890,7 +969,14 @@ def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: 
     
     # 1. WRITE user message to chat history (if session_id provided)
     if session_id:
-        repo.save_message(session_id, "user", prompt)
+        try:
+            repo.save_message(session_id, "user", prompt)
+        except Exception as exc:
+            logger.exception(
+                "chat_history_write_failed role=user session_id=%s error=%s",
+                session_id,
+                str(exc),
+            )
     
     # Initialize session state
     if session_state is None:
@@ -904,10 +990,18 @@ def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: 
         "history": session_state.get("history", []),
     }
     
-    # Use only in-memory session history for conversational context.
-    # Persisted DB history is still written for auditing/export, but not used for live context resolution.
-    in_memory_history = session_state.get("history", []) if isinstance(session_state, dict) else []
-    conversation_history = in_memory_history
+    # Prefer persisted history so follow-up turns work across Cloud Run instances.
+    conversation_history: List[Dict[str, Any]] = []
+    if session_id:
+        conversation_history = _load_persisted_history(repo, session_id, limit=16)
+
+    # Keep any in-memory history as a fallback for local/dev flows.
+    if not conversation_history:
+        in_memory_history = session_state.get("history", []) if isinstance(session_state, dict) else []
+        conversation_history = [
+            msg for msg in in_memory_history
+            if isinstance(msg, dict)
+        ]
 
     # Parse user message with context from prior turns.
     parsed = llm_parse_user_message(client, prompt, conversation_history=conversation_history)
@@ -943,8 +1037,17 @@ def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: 
     focus_only = parsed["filters"]["focus_only"]
     required_only = parsed["filters"]["required_only"]
     parsed_categories = parsed["filters"].get("categories") or []
+
+    # Deterministic fallback for explicit follow-up phrases. This keeps the backend
+    # from depending entirely on the LLM for simple filters like "science only".
+    seed_prefs = parse_preferences_seed(prompt)
+    if seed_prefs.get("exclusive_domain"):
+        focus_only = seed_prefs["exclusive_domain"]
+    if seed_prefs.get("required_only"):
+        required_only = True
+
     if user_explicitly_requests_categories(prompt):
-        categories_only: List[str] = parsed_categories or session_state.get("categories", [])
+        categories_only: List[str] = resolve_categories_only(parsed["filters"], seed_prefs) or session_state.get("categories", [])
     else:
         categories_only = session_state.get("categories", [])
     
@@ -957,6 +1060,18 @@ def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: 
         completed_courses=completed_courses,
         completed_domains=completed_domains
     )
+
+    if seed_prefs.get("exclusive_domain"):
+        seed_focus = seed_prefs["exclusive_domain"]
+        for campus_key, rows in list(campus_to_remaining.items()):
+            campus_to_remaining[campus_key] = [
+                row for row in rows
+                if repo._course_domain(
+                    row.get("dvc_code", ""),
+                    row.get("dvc_title", ""),
+                    row.get("domain"),
+                ) == seed_focus
+            ]
     
     # 3. Call AI to format the response
     formatted = llm_format_response_multi(
@@ -978,7 +1093,14 @@ def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: 
     
     # 4. WRITE assistant response to chat history (persisted to Cloud SQL)
     if session_id:
-        repo.save_message(session_id, "assistant", formatted)
+        try:
+            repo.save_message(session_id, "assistant", formatted)
+        except Exception as exc:
+            logger.exception(
+                "chat_history_write_failed role=assistant session_id=%s error=%s",
+                session_id,
+                str(exc),
+            )
     
     return formatted, session_state
 

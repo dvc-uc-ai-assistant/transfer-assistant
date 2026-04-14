@@ -182,11 +182,25 @@ export default function NexaChat() {
       }
 
       if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        throw new Error(t || `HTTP ${res.status}`);
+        const textBody = await res.text().catch(() => "");
+        let backendMessage = textBody;
+        try {
+          const parsed = JSON.parse(textBody);
+          if (parsed && typeof parsed === "object" && typeof parsed.error === "string") {
+            backendMessage = parsed.error;
+          }
+        } catch {
+          // Keep raw text body when response is not JSON.
+        }
+        throw new Error(backendMessage || `HTTP ${res.status}`);
       }
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("Server returned an invalid JSON response.");
+      }
 
       if (data.session_id) {
         setSessionId(data.session_id);
@@ -200,9 +214,10 @@ export default function NexaChat() {
       setMessages((prev) => [...prev, { role: "bot", content: reply }]);
     } catch (err) {
       console.error("[DEBUG] Fetch error:", err);
+      const message = err instanceof Error ? err.message : "Unexpected network error.";
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "⚠️ I couldn't reach the server. Check the base URL in .env and try again." },
+        { role: "assistant", content: `⚠️ Request failed: ${message}` },
       ]);
     } finally {
       setLoading(false);

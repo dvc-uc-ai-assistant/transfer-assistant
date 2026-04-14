@@ -35,7 +35,7 @@
 ### 1. Build and Deploy via Cloud Build
 
 ```powershell
-gcloud builds submit --region=us-central1 --substitutions="_INSTANCE_CONNECTION_NAME=nexa-transfer-new:us-central1:transfer-assistant-pg,COMMIT_SHA=v2"
+gcloud builds submit --region=us-central1 --substitutions="_INSTANCE_CONNECTION_NAME=nexa-transfer-new:us-central1:transfer-assistant-pg"
 ```
 
 This command:
