@@ -945,6 +945,27 @@ def interactive_session(client: OpenAI, repo: PostgresRepository, args) -> None:
             print_lists(ck, campus_to_remaining[ck], completed_courses, completed_domains)
 
 # ============================================
+# GREETING DETECTION
+# ============================================
+def detect_happy_user_greeting(prompt: str) -> Optional[str]:
+    """
+    Detect 'HappyUser XXX' pattern where XXX is 3 digits and return a greeting.
+    
+    Args:
+        prompt: User's input prompt
+    
+    Returns:
+        Greeting message if pattern matches, None otherwise
+    """
+    # Match "HappyUser" followed by exactly 3 digits (case-insensitive)
+    match = re.search(r'happy\s*user\s+(\d{3})', prompt, re.IGNORECASE)
+    if match:
+        user_id = match.group(1)
+        greeting = f"👋 Welcome, HappyUser {user_id}! I'm NEXA, your DVC → UC Transfer Assistant. Ask me anything about transferring to UC Berkeley, UC Davis, or UC San Diego! 🚀"
+        return greeting
+    return None
+
+# ============================================
 # API FUNCTION (for direct import from Flask)
 # ============================================
 def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: Optional[str] = None) -> Tuple[str, Dict]:
@@ -963,6 +984,33 @@ def get_response(prompt: str, session_state: Optional[Dict] = None, session_id: 
     Raises:
         ValueError: If API key or database connection fails
     """
+    # Check for HappyUser greeting pattern first
+    greeting = detect_happy_user_greeting(prompt)
+    if greeting:
+        repo = get_repository()
+        # Initialize session state if needed
+        if session_state is None:
+            session_state = {}
+        session_state = {
+            "campuses": session_state.get("campuses", []),
+            "completed_courses": session_state.get("completed_courses", []),
+            "completed_domains": session_state.get("completed_domains", []),
+            "categories": session_state.get("categories", []),
+            "history": session_state.get("history", []),
+        }
+        # Save greeting to history if session_id provided
+        if session_id:
+            try:
+                repo.save_message(session_id, "user", prompt)
+                repo.save_message(session_id, "assistant", greeting)
+            except Exception as exc:
+                logger.exception(
+                    "chat_history_write_failed for greeting session_id=%s error=%s",
+                    session_id,
+                    str(exc),
+                )
+        return greeting, session_state
+    
     # Get singleton instances
     client = get_client()
     repo = get_repository()
